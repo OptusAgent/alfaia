@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: "Instrument Serif", Georgia, serif;
+    --font-sans: "Instrument Sans", "Plus Jakarta Sans", -apple-system, sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+    
+    --navy-dark: #072F53;
+    --navy-primary: #0E4A7B;
+    --navy-light: #1868A8;
+    --paper-bg: #F3F6F9;
+    --card-bg: #FFFFFF;
+    
+    --gold: #A67C2E;
+    --gold-bright: #EBB832;
+    --gold-light: #F2E7D0;
+    
+    --wine: #7B2233;
+    --wine-light: #F7E8EA;
+    
+    --sage: #4B7A5B;
+    --sage-light: #E5EFE7;
+    
+    --slate: #4A6B84;
+    --slate-light: #E5EDF3;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--paper-bg);
+    color: #1F1B17;
+  }
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Custom Ribbon / Bookmark Cards (from JPG Concept) */
+.ribbon-card {
+  position: relative;
+  background: linear-gradient(180deg, #0E4A7B 0%, #083358 100%);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  border-bottom-left-radius: 24px;
+  border-bottom-right-radius: 24px;
+  box-shadow: 0 10px 20px -5px rgba(14, 74, 123, 0.3);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ribbon-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 25px -5px rgba(14, 74, 123, 0.4);
+}
+
+.ribbon-card::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 6px;
+  background: #EBB832;
+  border-radius: 3px 3px 0 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}

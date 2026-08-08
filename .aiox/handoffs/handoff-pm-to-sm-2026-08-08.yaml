@@ -1,0 +1,33 @@
+handoff:
+  from_agent: pm
+  to_agent: sm
+  consumed: false
+  story_context:
+    story_id: null
+    story_path: null
+    story_status: null
+    current_task: "create-epic (materializacao a partir do PRD, nao brownfield)"
+    branch: main
+  decisions:
+    - "PRD-ALFAIA-v2.md ja continha o roadmap completo (§25) — epicos materializados, nao inventados (Artigo IV)"
+    - "core-config.yaml corrigido: prdFile=PRD-ALFAIA-v2.md, prdSharded=true, prdShardedLocation=docs/prd"
+    - "E3 bloqueia E4 (dependencia explicita do PRD §25.1, nao inferida)"
+    - "E9 (S-35, S-36) bloqueado ate @po emendar PRD §24 com estrategia Cloud Run -> VPS"
+    - "Mapeamento E8/E9 para fase F7 e proposta do @pm, nao literal do PRD — validar com usuario"
+  files_modified:
+    - docs/prd/epic-1-fundacao.md
+    - docs/prd/epic-2-canal.md
+    - docs/prd/epic-3-identificacao.md
+    - docs/prd/epic-4-atendimento.md
+    - docs/prd/epic-5-integracao-wl.md
+    - docs/prd/epic-6-crm.md
+    - docs/prd/epic-7-campanhas.md
+    - docs/prd/epic-8-configuracao.md
+    - docs/prd/epic-9-operacao.md
+    - docs/prd/README.md
+    - .aiox-core/core-config.yaml
+  blockers:
+    - "E9 (S-35, S-36): PRD §24 nao formaliza estrategia de deploy — aguardando @po"
+    - "S-15 (E4): Q8 aberta (modelo de LLM) — aguardando Optus Agent"
+    - "S-20, S-21 (E5): Q1-Q3 abertas — aguardando WebLocacao"
+  next_action: "sm *draft do primeiro epico (EPIC-1 Fundacao, S-01) usando docs/prd/epic-1-fundacao.md como fonte"

@@ -1,0 +1,24 @@
+handoff:
+  from_agent: sm
+  to_agent: po
+  consumed: true
+  story_context:
+    story_id: "1.1 a 9.2 (36 stories)"
+    story_path: docs/stories/
+    story_status: Draft (todas)
+    current_task: "criacao de todas as 36 stories a partir de docs/prd/epic-*.md"
+    branch: main
+  decisions:
+    - "Numeracao de arquivo (epico.N) segue ordem de DESENVOLVIMENTO recomendada pelo @sm, nao a ordem S-xx do PRD — PRD ID de cada story fica registrado no titulo do arquivo"
+    - "Unica reordenacao mandatoria do PRD: E3 inteiro antes de E4 (§25.1, 'F2 precede F3'). Demais reordenacoes sao julgamento do @sm (S-19 adiantada, S-16 antes de S-15, S-33 logo apos E4, S-32/S-34 ao final de E8)"
+    - "2.4 (S-06) e 4.3 (S-15) tem bloqueio parcial documentado no proprio arquivo — podem ser codificadas, nao podem fechar DoR/DoD ainda"
+    - "8.3 (S-34) nao tem AC formal na matriz PRD §26 — @po precisa fundamentar antes de mover para Ready, conforme DoR §27.1 item 1"
+    - "9.1 e 9.2 (S-35, S-36) bloqueadas por gate de docs/prd/epic-9-operacao.md ate @po emendar PRD §24"
+  files_modified:
+    - docs/stories/1.1.story.md ... docs/stories/9.2.story.md (36 arquivos)
+    - docs/architecture/aucta-flux-integration.md
+    - docs/architecture/deploy-cloud-run-setup.md
+  blockers:
+    - "8.3 (S-34): sem AC formal, @po deve fundamentar via §17.2/§4"
+    - "9.1, 9.2 (S-35, S-36): aguardando emenda do PRD §24 pelo @po"
+  next_action: "po *validate-story-draft comecando por 1.1, seguindo a ordem numerica dos arquivos em docs/stories/"

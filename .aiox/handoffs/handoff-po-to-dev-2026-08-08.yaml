@@ -1,0 +1,26 @@
+handoff:
+  from_agent: po
+  to_agent: dev
+  consumed: false
+  story_context:
+    story_id: "1.1"
+    story_path: docs/stories/1.1.story.md
+    story_status: Ready
+    current_task: "validacao das 36 stories + emenda do PRD §24 concluidas — 36 Ready"
+    branch: main
+  decisions:
+    - "34/36 stories validadas GO direto (score >=7/10, checklist de story-lifecycle.md) e movidas Draft -> Ready"
+    - "4 stories 'Ready com ressalva' (2.4, 4.3, 5.2, 5.3): podem iniciar contra mock/contrato documentado, DoD travado ate bloqueio externo resolver — nao tratar como bug se @dev nao conseguir fechar 100%"
+    - "8.3 fundamentada pelo @po via composicao de PRD §4.1/§17.2/§17.3/§17.7/§17.9 — nao precisou emenda de PRD"
+    - "9.1 e 9.2: gate resolvido em 08/08/2026 — PRD §24 emendado (v2.0 -> v2.1) com a estrategia Cloud Run (dev/teste) -> VPS EasyPanel/Dockplot (producao pos-venda). Ambas Ready agora, sem ressalva"
+    - "Documento tecnico de solicitacao de acesso a API preparado para envio a WebLocacao (docs/integracoes/weblocacao-solicitacao-api.md) — cobre S-20/S-21, nao muda o status Ready-com-ressalva dessas stories ate a WebLocacao responder"
+  files_modified:
+    - docs/stories/1.1.story.md ... docs/stories/9.2.story.md (Status + Change Log atualizados em todas as 36)
+    - PRD-ALFAIA-v2.md (§24 emendado, versao 2.0 -> 2.1)
+    - docs/prd/epic-9-operacao.md (gate marcado resolvido)
+    - docs/integracoes/weblocacao-solicitacao-api.md (novo)
+  blockers:
+    - "2.4: aguardando credenciais Aucta para fechar (nao para iniciar)"
+    - "4.3: aguardando resposta de Q8 (modelo de LLM) para fechar (nao para iniciar)"
+    - "5.2, 5.3: aguardando resposta da WebLocacao (documento de solicitacao pronto, envio e resposta ainda pendentes) para fechar (nao para iniciar)"
+  next_action: "dev *develop 1.1 — seguir a ordem numerica dos arquivos em docs/stories/ (1.1, 1.2, 1.3, 2.1, ...). Todas as 36 stories estao Ready; nenhuma bloqueia o inicio."

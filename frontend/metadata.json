@@ -1,0 +1,6 @@
+{
+  "name": "ALFAIA CRM",
+  "description": "Atendimento e CRM conversacional para locação de trajes integrado à WebLocação com pipeline Kanban, simulação WhatsApp e relatórios analíticos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

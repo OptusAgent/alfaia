@@ -1,0 +1,13 @@
+schema: 1
+story: '1.1'
+gate: CONCERNS
+status_reason: 'ACs 1-5 atendidas e verificadas com dados reais (2 bugs de RLS encontrados e corrigidos na própria story); falta suíte de teste automatizado permanente para a cobertura de RLS que coding-standards.md §6 exige.'
+reviewer: 'Quinn'
+reviewed_revision: 'uncommitted working tree — sem commit ainda nesta sessão'
+updated: '2026-08-08T22:00:00Z'
+top_issues:
+  - id: 'TEST-001'
+    severity: medium
+    finding: 'Teste de isolamento cross-tenant (AC 4) foi executado manualmente via MCP (sessão simulada com SET LOCAL + usuários descartáveis), não existe como teste automatizado repetível no repositório (ex.: pgTAP em supabase/tests/).'
+    suggested_action: 'Criar suíte pgTAP ou equivalente cobrindo os cenários já verificados manualmente, antes que mais tabelas de domínio dependam do mesmo padrão de RLS.'
+waiver: { active: false }
