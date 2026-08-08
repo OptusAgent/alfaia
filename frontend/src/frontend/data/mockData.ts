@@ -1,0 +1,257 @@
+import { 
+  KanbanColumn, 
+  Lead, 
+  FollowUpTemplate, 
+  Scenario, 
+  DaySchedule, 
+  ContactRecord, 
+  AutomationRoutine, 
+  ProviderCapability 
+} from '../types';
+
+export const KANBAN_COLUMNS: KanbanColumn[] = [
+  { k: 'novo', n: 'Novo', c: '#94A3B8' },
+  { k: 'qualificando', n: 'Qualificando', c: '#4A6B84' },
+  { k: 'orcamento', n: 'Orçamento', c: '#B07A18' },
+  { k: 'follow_up', n: 'Follow-up', c: '#7B2233' },
+  { k: 'negociando', n: 'Negociando', c: '#A67C2E' },
+  { k: 'agendado', n: 'Agendado', c: '#7A5CA8' },
+  { k: 'ganho', n: 'Ganho', c: '#4B7A5B' },
+];
+
+export const INITIAL_LEADS: Lead[] = [
+  { id: 'l1', n: 'Marcela Prado', t: '85 98812-4477', st: 'agendado', ev: 'Casamento · 12/09', pc: 'Vestido longo 42', or: 'WhatsApp', v: 520, h: '2h', hot: true, ag: 'Sáb 09/08 14h' },
+  { id: 'l2', n: 'Camila Ferraz', t: '85 99012-8876', st: 'orcamento', ev: 'Formatura · 28/11', pc: 'Vestido longo 38', or: 'Instagram', v: 465, h: '5h' },
+  { id: 'l3', n: 'Bruno Aquino', t: '85 98877-3341', st: 'follow_up', ev: 'Casamento · 12/09', pc: 'Terno slim 48', or: 'Indicação', v: 390, h: '2 dias', cold: true, fu: 1 },
+  { id: 'l4', n: 'Renata Lopes', t: '85 99330-2214', st: 'follow_up', ev: '15 anos · 19/09', pc: 'Vestido longo 40', or: 'WhatsApp', v: 450, h: '3 dias', cold: true, fu: 2 },
+  { id: 'l5', n: 'Tiago Nunes', t: '85 99406-2130', st: 'negociando', ev: 'Casamento · 22/08', pc: 'Terno grafite 50', or: 'WhatsApp', v: 380, h: '40min', hot: true },
+  { id: 'l6', n: 'Sofia Menezes', t: '85 99228-6631', st: 'novo', ev: '—', pc: '—', or: 'WhatsApp', v: 0, h: '12min', hot: true },
+  { id: 'l7', n: 'Larissa Teles', t: '85 99661-4408', st: 'qualificando', ev: 'Casamento · 03/10', pc: '—', or: 'Google', v: 0, h: '1h' },
+  { id: 'l8', n: 'Rodrigo Sales', t: '85 99772-3341', st: 'ganho', ev: 'Formatura · 28/11', pc: 'Terno marinho 46', or: 'Campanha', v: 400, h: 'ontem' },
+  { id: 'l9', n: 'Helena Duarte', t: '85 98337-2219', st: 'agendado', ev: '15 anos · 19/09', pc: 'Vestido infantil', or: 'Indicação', v: 230, h: '6h', ag: 'Qua 13/08 14h30' },
+  { id: 'l10', n: 'Paulo Henrique', t: '85 98005-7719', st: 'orcamento', ev: 'Casamento · 12/09', pc: 'Terno bege 52', or: 'WhatsApp', v: 410, h: '8h' },
+  { id: 'l11', n: 'Ana Beatriz', t: '85 98441-0092', st: 'novo', ev: '—', pc: '—', or: 'Instagram', v: 0, h: '3min', hot: true },
+  { id: 'l12', n: 'Vitória Sousa', t: '85 99552-1108', st: 'ganho', ev: 'Casamento · 03/10', pc: 'Vestido rosé 38', or: 'WhatsApp', v: 460, h: '2 dias' },
+];
+
+export const FOLLOW_UP_TEMPLATES: FollowUpTemplate[] = [
+  { n: 'Retomada leve', c: 'Oi {{nome}}! Passando pra saber se ainda está procurando o traje pro {{evento}}. Se quiser, separo as opções de novo 💛' },
+  { n: 'Escassez de data', c: 'Oi {{nome}}! As peças pra {{evento}} estão saindo rápido pra essa data. Quer que eu reserve alguma pra você provar?' },
+  { n: 'Convite para prova', c: 'Oi {{nome}}! Que tal marcar uma prova sem compromisso? Tenho horário essa semana e você decide só depois de vestir.' },
+  { n: 'Condição especial', c: 'Oi {{nome}}! Consegui uma condição especial pro traje que você viu. Posso te mandar?' },
+];
+
+export const CHAT_SCENARIOS: Scenario[] = [
+  {
+    id: 'c1',
+    t: 'Lead novo · disponibilidade e agendamento',
+    h: 'Sábado, 22h — ninguém na loja',
+    c: { n: 'Marcela Prado', i: 'MP', p: '+55 85 98812-4477' },
+    pv: 'Tenho um casamento dia 12/09, procuro vestido longo…',
+    ctx: [
+      ['Lead', '—', 'l'],
+      ['Telefone', '+55 85 98812-4477'],
+      ['Status', 'novo', 's'],
+      ['Evento', '—', 'e'],
+      ['Peça', '—', 'p'],
+      ['Prova', '—', 'a'],
+    ],
+    steps: [
+      { k: 'in', t: 'Oi, boa noite! Tenho um casamento dia 12 de setembro e tô procurando um vestido longo. Uso 42.' },
+      { k: 'ctx', key: 'l', v: 'Marcela Prado' },
+      { k: 'ctx', key: 'e', v: 'Casamento · 12/09' },
+      { k: 'ctx', key: 's', v: 'qualificando', h: 1 },
+      { k: 'api', m: 'GET', p: '/produtos?data_inicio=2026-09-11&data_fim=2026-09-13&categoria=vestido_longo&tamanho=42', r: '200 · 3 disponíveis' },
+      {
+        k: 'ia',
+        t: 'Boa noite, Marcela! Que ótimo 💛\n\nPara 12 de setembro, tamanho 42, tenho estes disponíveis:',
+        prods: [
+          { n: 'Longo Bordô', d: 'VLB-118 · 42', p: 'R$ 480', g: ['#7B2233', '#3E0F1B'], k: 'd' },
+          { n: 'Longo Champanhe', d: 'VLC-204 · 42', p: 'R$ 520', g: ['#D8C08A', '#9E8348'], k: 'd' },
+          { n: 'Longo Verde Musgo', d: 'VLM-077 · 42', p: 'R$ 450', g: ['#4A5D46', '#242E22'], k: 'd' },
+        ],
+      },
+      { k: 'ctx', key: 's', v: 'orçamento', h: 1 },
+      { k: 'ctx', key: 'p', v: 'Vestido longo 42' },
+      { k: 'in', t: 'Amei o champanhe! Consigo provar no sábado?' },
+      { k: 'api', m: 'GET', p: '/agenda/slots?tipo=prova&data_inicio=2026-08-08&data_fim=2026-08-08', r: '200 · 3 horários com vaga' },
+      { k: 'ia', t: 'Consegue sim. Sábado (08/08) tenho 10h30, 14h ou 16h30. Qual fica melhor?' },
+      { k: 'in', t: '14h tá ótimo' },
+      { k: 'api', m: 'POST', p: '/agenda', r: '201 · agendamento #A-8842 · 08/08 14h', w: 1 },
+      { k: 'ctx', key: 'a', v: '08/08 · 14h', h: 1 },
+      { k: 'ctx', key: 's', v: 'agendado', h: 1 },
+      { k: 'ia', t: 'Prontinho, Marcela! ✨\n\n📅 Sábado, 08/08 às 14h\n👗 Vestido Longo Champanhe (VLC-204)\n📍 Av. Santos Dumont, 1440\n\nTe espero!' },
+      { k: 'sys', t: 'Lead criado e movido para “agendado” · agendamento gravado na WebLocação · nenhum humano acionado' },
+    ],
+  },
+  {
+    id: 'c2',
+    t: 'Lead frio retomado por follow-up',
+    h: 'O card estava em follow-up há 2 dias',
+    c: { n: 'Bruno Aquino', i: 'BA', p: '+55 85 98877-3341' },
+    pv: 'Opa, ainda tô sim! O terno era o de 390?',
+    ctx: [
+      ['Lead', 'Bruno Aquino'],
+      ['Telefone', '+55 85 98877-3341'],
+      ['Status', 'follow_up', 's'],
+      ['Evento', 'Casamento · 12/09'],
+      ['Peça', 'Terno slim 48'],
+      ['Tentativas', '1 de 3', 't'],
+    ],
+    steps: [
+      { k: 'sys', t: 'Follow-up disparado pela dona da loja · mensagem “Retomada leve”' },
+      { k: 'ag', t: 'Oi Bruno! Passando pra saber se ainda está procurando o traje pro casamento. Se quiser, separo as opções de novo 💛' },
+      { k: 'in', t: 'Opa, ainda tô sim! O terno era o de 390?' },
+      { k: 'ctx', key: 's', v: 'negociando', h: 1 },
+      { k: 'ctx', key: 't', v: 'zerado', h: 1 },
+      { k: 'api', m: 'GET', p: '/produtos?q=terno+slim&tamanho=48&data_inicio=2026-09-11&data_fim=2026-09-13', r: '200 · 1 disponível' },
+      { k: 'ia', t: 'Isso mesmo, Bruno! O Terno Slim Grafite (TG-330), tamanho 48, sai por R$ 390 e está livre pra data do casamento.\n\nQuer marcar a prova? Tenho horário quinta e sábado.' },
+      { k: 'in', t: 'Quinta à tarde funciona' },
+      { k: 'api', m: 'GET', p: '/agenda/slots?tipo=prova&data_inicio=2026-08-13&data_fim=2026-08-13', r: '200 · 2 horários' },
+      { k: 'ia', t: 'Quinta (13/08) tenho 15h ou 17h30. Qual prefere?' },
+      { k: 'sys', t: 'Lead recuperado · saiu de follow-up e voltou a negociar sem intervenção humana' },
+    ],
+  },
+  {
+    id: 'c3',
+    t: 'Transbordo e devolução para a IA',
+    h: 'Nem tudo é para automatizar',
+    c: { n: 'Regina Alencar', i: 'RA', p: '+55 85 98177-9052' },
+    pv: 'O vestido da minha filha rasgou na barra…',
+    ctx: [
+      ['Lead', 'Regina Alencar'],
+      ['Telefone', '+55 85 98177-9052'],
+      ['Status', 'ganho'],
+      ['Evento', 'Casamento · 09/08'],
+      ['Peça', 'Noiva Sereia NS-012'],
+      ['Classificação', '—', 'c'],
+    ],
+    steps: [
+      { k: 'in', t: 'Boa tarde. O vestido da minha filha rasgou na barra e o casamento é sábado. Preciso falar com alguém agora, por favor.' },
+      { k: 'ctx', key: 'c', v: 'Crítico · avaria', h: 1 },
+      { k: 'sys', t: 'Classificado como CRÍTICO (avaria + evento em 2 dias). A IA não tenta resolver e não promete prazo.' },
+      { k: 'ia', t: 'Dona Regina, entendi a urgência e já estou acionando a equipe agora.\n\nA Juliana assume a conversa em instantes.' },
+      { k: 'ho' },
+    ],
+    after: [
+      { k: 'ag', t: 'Dona Regina, aqui é a Juliana. Pode trazer o vestido hoje até as 18h que a costureira resolve a barra ainda hoje. Sem custo, é ajuste nosso.' },
+      { k: 'in', t: 'Ai que alívio, muito obrigada! Saio agora.' },
+    ],
+  },
+];
+
+export const WEEKLY_SCHEDULE: DaySchedule[] = [
+  { d: 'Seg', n: 10, i: [{ t: '09:30', w: 'Ana Beatriz', x: 'Prova · vestido rosé', b: 1 }, { t: '14:00', w: 'Rodrigo Sales', x: 'Atendimento', k: 'at' }] },
+  { d: 'Ter', n: 11, i: [{ t: '10:00', w: 'Camila Ferraz', x: 'Prova · longo bordô', b: 1 }, { t: '11:30', w: 'Lucas Prado', x: 'Prova · terno preto', b: 1 }] },
+  { d: 'Qua', n: 12, i: [{ t: '14:30', w: 'Helena Duarte', x: 'Prova · infantil', b: 1 }, { t: '17:00', w: 'Paulo Henrique', x: 'Atendimento', k: 'at' }] },
+  { d: 'Qui', n: 13, i: [{ t: '11:00', w: 'Marina Costa', x: 'Prova · verde musgo', b: 1 }, { t: '17:30', w: 'Tiago Nunes', x: 'Prova · terno grafite', b: 1 }] },
+  { d: 'Sex', n: 14, i: [{ t: '15:00', w: 'Otávio Lins', x: 'Prova · terno chumbo', b: 1 }] },
+  { d: 'Sáb', n: 15, i: [{ t: '10:30', w: 'Marcela Prado', x: 'Prova · champanhe', b: 1 }, { t: '14:00', w: 'Sofia Menezes', x: 'Prova · noiva reta' }, { t: '16:30', w: 'Bruno Aquino', x: 'Prova · terno slim', b: 1 }] },
+];
+
+export const INITIAL_CONTACTS: ContactRecord[] = [
+  { name: 'Bruno Aquino', event: 'Casamento', month: 'Setembro', interest: 'Terno slim 48', status: 'Descartado', lastContact: 'há 3 dias' },
+  { name: 'Larissa Teles', event: 'Casamento', month: 'Outubro', interest: 'Vestido longo', status: 'Ativo', lastContact: 'há 1 hora' },
+  { name: 'Marcos Vinícius', event: 'Casamento', month: 'Setembro', interest: 'Terno', status: 'Descartado', lastContact: 'há 12 dias' },
+  { name: 'Priscila Matos', event: 'Formatura', month: 'Novembro', interest: 'Vestido longo 40', status: 'Descartado', lastContact: 'há 8 dias' },
+  { name: 'Vitória Sousa', event: 'Casamento', month: 'Outubro', interest: 'Vestido rosé 38', status: 'Ganho', lastContact: 'há 2 dias' },
+  { name: 'Letícia Barros', event: 'Formatura', month: 'Novembro', interest: 'Vestido longo', status: 'Descartado', lastContact: 'há 20 dias' },
+  { name: 'Caio Duarte', event: 'Casamento', month: 'Outubro', interest: 'Terno', status: 'Descartado', lastContact: 'há 5 dias' },
+  { name: 'Ana Clara', event: '15 anos', month: 'Setembro', interest: 'Vestido dama', status: 'Ativo', lastContact: 'há 6 horas' },
+  { name: 'Igor Bezerra', event: 'Casamento', month: 'Dezembro', interest: 'Terno bege', status: 'Descartado', lastContact: 'há 30 dias' },
+  { name: 'Tatiane Rocha', event: 'Casamento', month: 'Outubro', interest: 'Vestido madrinha', status: 'Descartado', lastContact: 'há 9 dias' },
+  { name: 'Gustavo Peixoto', event: 'Formatura', month: 'Novembro', interest: 'Terno marinho', status: 'Ativo', lastContact: 'há 2 dias' },
+  { name: 'Rita Nogueira', event: 'Casamento', month: 'Outubro', interest: 'Vestido mãe', status: 'Descartado', lastContact: 'há 15 dias' },
+];
+
+export const AUTOMATIONS: AutomationRoutine[] = [
+  {
+    n: 'Atendimento e qualificação',
+    g: 'Mensagem nova · 24h',
+    on: true,
+    d: 'Entende o que o lead quer em linguagem natural, sem menu. Qualifica evento, data, peça e tamanho, e registra o lead no pipeline.',
+    m: [['Conversas/mês', '412'], ['Sem humano', '78%']],
+    ic: 'chat',
+  },
+  {
+    n: 'Consulta de disponibilidade',
+    g: 'Lead expressa o desejo',
+    on: true,
+    d: 'Busca na WebLocação em tempo real a partir do evento, estilo, cor, tamanho e data. Nunca inventa peça: se a API falhar, abre transbordo.',
+    m: [['Consultas/mês', '388'], ['Latência média', '180ms']],
+    ic: 'search',
+  },
+  {
+    n: 'Agendamento',
+    g: 'Lead aceita marcar',
+    on: true,
+    d: 'Lê os horários com vaga e grava o agendamento direto na WebLocação. Alterações posteriores são feitas pelo lojista no portal do ERP.',
+    m: [['Provas/mês', '34'], ['No-show', '6%']],
+    ic: 'calendar',
+  },
+  {
+    n: 'Follow-up de lead frio',
+    g: 'Silêncio além da janela',
+    on: true,
+    d: 'Move o card para Follow-up após o tempo configurado e ativa o botão de disparo. O lojista escolhe a mensagem e envia com um clique.',
+    m: [['Disparos/mês', '96'], ['Taxa de resposta', '31%']],
+    ic: 'clock',
+  },
+  {
+    n: 'Descarte inteligente',
+    g: 'Desistência ou 3 tentativas',
+    on: true,
+    d: 'Reconhece quando o lead desistiu e tira o card do quadro. O contato permanece na base com as tags, pronto para campanha futura.',
+    m: [['Descartados/mês', '61'], ['Retidos na base', '100%']],
+    ic: 'trash',
+  },
+  {
+    n: 'Transbordo',
+    g: 'Pedido ou assunto crítico',
+    on: true,
+    d: 'Abre a fila para o humano e pausa a IA. O atendente assume, responde, e devolve a conversa para a automação quando quiser.',
+    m: [['Transbordos/mês', '23'], ['Tempo até assumir', '4min']],
+    ic: 'userCheck',
+  },
+  {
+    n: 'Campanha segmentada',
+    g: 'Manual ou agendada',
+    on: false,
+    d: 'Dispara promoção ou remarketing para um segmento da base. Respeita opt-out, horário comercial e intervalo aleatório entre envios.',
+    m: [['Campanhas', '3'], ['Status', 'Piloto']],
+    ic: 'send',
+  },
+];
+
+export const PROVIDERS: ProviderCapability[] = [
+  {
+    k: 'meta',
+    n: 'Meta Cloud API',
+    s: 'Oficial · via BSP',
+    ic: '#25D366',
+    phone: '+55 85 3122-7700',
+    caps: [
+      ['Tipo de conta', 'Oficial verificada', 'y'],
+      ['Janela de 24h', 'Obrigatória', 'r'],
+      ['Fora da janela', 'Só template aprovado', 'r'],
+      ['Delay anti-ban', 'Não necessário', 'y'],
+      ['Risco de banimento', 'Praticamente nulo', 'y'],
+      ['Assinatura do webhook', 'HMAC obrigatório', 'y'],
+    ],
+  },
+  {
+    k: 'uazapi',
+    n: 'UAZAPI',
+    s: 'Não oficial · WhatsApp Web',
+    ic: '#B07A18',
+    phone: '+55 85 98800-1122',
+    caps: [
+      ['Tipo de conta', 'WhatsApp Business comum', 'n'],
+      ['Janela de 24h', 'Não se aplica', 'y'],
+      ['Fora da janela', 'Texto livre liberado', 'y'],
+      ['Delay anti-ban', '5s a 15s obrigatório', 'r'],
+      ['Risco de banimento', 'Existe', 'r'],
+      ['Assinatura do webhook', 'Token na URL', 'n'],
+    ],
+  },
+];
