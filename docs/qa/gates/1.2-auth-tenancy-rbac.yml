@@ -1,0 +1,21 @@
+schema: 1
+story: '1.2'
+gate: CONCERNS
+status_reason: '33/33 combinações da matriz de §4.2 verificadas corretas (incluindo isolamento cross-tenant); falta suíte automatizada e 2 identificadores de permissão (ia_config:update, contato:export) ainda sem rota confirmada em §18.2.'
+reviewer: 'Quinn'
+reviewed_revision: 'uncommitted working tree — sem commit ainda nesta sessão'
+updated: '2026-08-08T22:00:00Z'
+top_issues:
+  - id: 'TEST-002'
+    severity: medium
+    finding: 'has_permission() foi validada manualmente (33 combinações + teste de isolamento por tenant), mas não há teste automatizado no repositório. Qualquer regressão futura na matriz private.permissoes_papel não seria detectada por CI.'
+    suggested_action: 'Criar suíte automatizada (pgTAP ou teste de integração no worker/portal) cobrindo as 33+ combinações antes de novas tabelas de domínio referenciarem has_permission() em suas policies.'
+  - id: 'REQ-001'
+    severity: low
+    finding: 'ia_config:update e contato:export foram inferidos pelo @dev (sem rota confirmada em §18.2) para preencher a matriz de §4.2. Funcionam corretamente hoje, mas o nome pode não bater com a rota real quando as stories 8.1 e 9.2 forem implementadas.'
+    suggested_action: '@po ou @dev confirmar/renomear esses 2 identificadores quando 8.1 (prompt/persona) e 9.2 (exportação LGPD) definirem as rotas reais — risco de nomenclatura, não de comportamento.'
+  - id: 'SEC-001'
+    severity: low
+    finding: 'Supabase Auth "Leaked Password Protection" está desabilitado no projeto (achado do advisor, não específico desta story — configuração de projeto).'
+    suggested_action: 'Habilitar no dashboard do Supabase quando convier — não bloqueia nenhuma story, é configuração de projeto, não de código.'
+waiver: { active: false }
