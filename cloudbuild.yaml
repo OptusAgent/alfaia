@@ -1,0 +1,44 @@
+# CI/CD do Portal — acionado pelo trigger do Cloud Build a cada push em
+# main que toque portal/**. Substituitions (_SUPABASE_URL, _SUPABASE_ANON_KEY,
+# _REGION, _SERVICE) sao configuradas no trigger, nao aqui — nenhuma delas e
+# segredo (anon key e publica por design, protegida por RLS).
+#
+# O cloudbuild.yaml fica na RAIZ do repo (e onde o Cloud Build procura por
+# padrao), mas o Dockerfile do portal esta em portal/. Por isso cada step que
+# roda dentro do app usa `dir: portal`.
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build
+    dir: portal
+    args:
+      - build
+      - '--build-arg'
+      - 'NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_SUPABASE_ANON_KEY=${_SUPABASE_ANON_KEY}'
+      - '-t'
+      - '${_IMAGE}:$SHORT_SHA'
+      - '-t'
+      - '${_IMAGE}:latest'
+      - '.'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_SERVICE}'
+      - '--image=${_IMAGE}:$SHORT_SHA'
+      - '--region=${_REGION}'
+      - '--allow-unauthenticated'
+      - '--set-env-vars=NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${_SUPABASE_ANON_KEY}'
+
+images:
+  - '${_IMAGE}:$SHORT_SHA'
+  - '${_IMAGE}:latest'
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
