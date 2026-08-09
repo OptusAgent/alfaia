@@ -24,11 +24,12 @@ steps:
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'
-    id: push
-    args:
-      - push
-      - '${_IMAGE}:$SHORT_SHA'
-      - '${_IMAGE}:latest'
+    id: push-sha
+    args: ['push', '${_IMAGE}:$SHORT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-latest
+    args: ['push', '${_IMAGE}:latest']
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: deploy
@@ -41,10 +42,6 @@ steps:
       - '--region=${_REGION}'
       - '--allow-unauthenticated'
       - '--set-env-vars=NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${_SUPABASE_ANON_KEY}'
-
-images:
-  - '${_IMAGE}:$SHORT_SHA'
-  - '${_IMAGE}:latest'
 
 options:
   substitutionOption: ALLOW_LOOSE
