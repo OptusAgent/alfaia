@@ -23,6 +23,13 @@ steps:
       - '${_IMAGE}:latest'
       - '.'
 
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push
+    args:
+      - push
+      - '${_IMAGE}:$SHORT_SHA'
+      - '${_IMAGE}:latest'
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: deploy
     entrypoint: gcloud
