@@ -1,11 +1,16 @@
 # CI/CD do Portal — acionado pelo trigger do Cloud Build a cada push em
-# main que toque portal/**. Substitutions (_SUPABASE_URL, _SUPABASE_ANON_KEY,
-# _REGION, _SERVICE) sao configuradas uma vez no trigger, nao aqui — nenhuma
-# delas e segredo (anon key e publica por design, protegida por RLS).
+# main que toque portal/**. Substituitions (_SUPABASE_URL, _SUPABASE_ANON_KEY,
+# _REGION, _SERVICE) sao configuradas no trigger, nao aqui — nenhuma delas e
+# segredo (anon key e publica por design, protegida por RLS).
+#
+# O cloudbuild.yaml fica na RAIZ do repo (e onde o Cloud Build procura por
+# padrao), mas o Dockerfile do portal esta em portal/. Por isso cada step que
+# roda dentro do app usa `dir: portal`.
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     id: build
+    dir: portal
     args:
       - build
       - '--build-arg'
