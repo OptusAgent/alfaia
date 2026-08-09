@@ -9,17 +9,33 @@ export default function LoginPage() {
   const [state, formAction, pending] = useActionState(signIn, initialState);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-neutral-900">ALFAIA</h1>
-        <p className="mb-6 text-sm text-neutral-500">
-          Entre com seu e-mail e senha para acessar o portal.
+    <main className="flex min-h-screen items-center justify-center bg-[#FAF7F2] px-4 py-12">
+      <div className="w-full max-w-md rounded-2xl border border-[#E7DFD2] bg-white p-8 shadow-[0_8px_24px_-14px_rgba(31,27,23,0.16)]">
+        {/* Header Logo */}
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#A67C2E] to-[#6E4F17] text-white shadow-[0_6px_16px_-8px_rgba(166,124,46,0.8)]">
+            <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+              <path d="M12 2L2 19h20L12 2zm0 4l6.5 11h-13L12 6z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="font-serif text-2xl font-bold tracking-wide text-[#1F1B17] leading-none">
+              ALFAIA
+            </h1>
+            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#B3A99C] block mt-1">
+              CRM CONVERSACIONAL & ATENDIMENTO
+            </span>
+          </div>
+        </div>
+
+        <p className="mb-6 text-sm text-[#544C43]">
+          Informe suas credenciais para acessar o painel de atendimento.
         </p>
 
-        <form action={formAction} noValidate className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="email" className="text-sm font-medium text-neutral-700">
-              E-mail
+        <form action={formAction} noValidate className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-[#544C43]">
+              E-mail corporativo
             </label>
             <input
               id="email"
@@ -27,13 +43,14 @@ export default function LoginPage() {
               type="email"
               autoComplete="email"
               required
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              placeholder="seu.email@empresa.com.br"
+              className="w-full rounded-lg border border-[#E7DFD2] bg-white px-3.5 py-2.5 text-sm text-[#1F1B17] placeholder-[#B3A99C] shadow-xs outline-none transition-all focus:border-[#A67C2E] focus:ring-2 focus:ring-[#A67C2E]/20"
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password" className="text-sm font-medium text-neutral-700">
-              Senha
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-[#544C43]">
+              Senha de acesso
             </label>
             <input
               id="password"
@@ -41,25 +58,27 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               required
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              placeholder="••••••••"
+              className="w-full rounded-lg border border-[#E7DFD2] bg-white px-3.5 py-2.5 text-sm text-[#1F1B17] placeholder-[#B3A99C] shadow-xs outline-none transition-all focus:border-[#A67C2E] focus:ring-2 focus:ring-[#A67C2E]/20"
             />
           </div>
 
           {state.error && (
-            <p role="alert" className="text-sm text-red-600">
+            <div className="rounded-lg bg-[#F7E8EA] border border-[#7B2233]/20 p-3 text-xs text-[#7B2233]">
               {state.error}
-            </p>
+            </div>
           )}
 
           <button
             type="submit"
             disabled={pending}
-            className="mt-2 rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-60"
+            className="mt-2 w-full rounded-lg bg-[#A67C2E] px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-[#8E6723] active:scale-[0.99] disabled:opacity-60 cursor-pointer"
           >
-            {pending ? "Entrando…" : "Entrar"}
+            {pending ? "Autenticando…" : "Entrar no Portal"}
           </button>
         </form>
       </div>
     </main>
   );
 }
+

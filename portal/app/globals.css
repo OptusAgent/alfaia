@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --font-serif: "Instrument Serif", Georgia, serif;
+    --font-sans: "Instrument Sans", "Plus Jakarta Sans", -apple-system, sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+    
+    --navy-dark: #072F53;
+    --navy-primary: #0E4A7B;
+    --navy-light: #1868A8;
+    --paper-bg: #F3F6F9;
+    --card-bg: #FFFFFF;
+    
+    --gold: #A67C2E;
+    --gold-bright: #EBB832;
+    --gold-light: #F2E7D0;
+    
+    --wine: #7B2233;
+    --wine-light: #F7E8EA;
+    
+    --sage: #4B7A5B;
+    --sage-light: #E5EFE7;
+    
+    --slate: #4A6B84;
+    --slate-light: #E5EDF3;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--paper-bg);
+    color: #1F1B17;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme {
+  --font-serif: var(--font-serif);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Custom Ribbon Cards */
+.ribbon-card {
+  position: relative;
+  background: linear-gradient(180deg, #0E4A7B 0%, #083358 100%);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  border-bottom-left-radius: 24px;
+  border-bottom-right-radius: 24px;
+  box-shadow: 0 10px 20px -5px rgba(14, 74, 123, 0.3);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ribbon-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 25px -5px rgba(14, 74, 123, 0.4);
+}
+
+.ribbon-card::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 6px;
+  background: #EBB832;
+  border-radius: 3px 3px 0 0;
+}
+
+
+
