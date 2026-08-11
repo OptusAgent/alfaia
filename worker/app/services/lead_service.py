@@ -26,6 +26,13 @@ class LeadModel(BaseModel):
     lead_seq: int = 1
     status: str = "novo"
     origem: str = "whatsapp_organico"
+    evento_tipo: str | None = None
+    evento_data: str | None = None
+    peca_interesse: str | None = None
+    tamanho: str | None = None
+    cor: str | None = None
+    valor_estimado: float | None = None
+    motivo_descarte: str | None = None
     reaberto_de_lead_id: str | None = None
     ultimo_contato_em: datetime = Field(default_factory=datetime.now)
     criado_em: datetime = Field(default_factory=datetime.now)
