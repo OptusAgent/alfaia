@@ -34,6 +34,8 @@ class LeadModel(BaseModel):
     valor_estimado: float | None = None
     motivo_descarte: str | None = None
     reaberto_de_lead_id: str | None = None
+    status_alterado_em: datetime = Field(default_factory=datetime.now)
+    status_alterado_por: str = "sistema"
     ultimo_contato_em: datetime = Field(default_factory=datetime.now)
     criado_em: datetime = Field(default_factory=datetime.now)
 
