@@ -32,6 +32,7 @@ class LeadModel(BaseModel):
     tamanho: str | None = None
     cor: str | None = None
     valor_estimado: float | None = None
+    followup_tentativas: int = 0
     motivo_descarte: str | None = None
     reaberto_de_lead_id: str | None = None
     status_alterado_em: datetime = Field(default_factory=datetime.now)
