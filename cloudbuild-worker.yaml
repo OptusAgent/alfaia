@@ -1,0 +1,61 @@
+# CI/CD do Worker FastAPI — acionado pelo trigger do Cloud Build a cada push em
+# main que toque worker/**
+#
+# Substitutions configuradas no trigger do Cloud Build (não aqui):
+#   _IMAGE   = gcr.io/SEU_PROJECT_ID/alfaia-worker
+#   _SERVICE = alfaia-worker
+#   _REGION  = southamerica-east1
+#
+# Variáveis de ambiente sensíveis (UAZAPI_ADMIN_TOKEN, OPENROUTER_API_KEY, etc.)
+# são configuradas diretamente no serviço Cloud Run via:
+#   gcloud run services update alfaia-worker --set-env-vars KEY=VALUE
+# ou pelo console GCP → Cloud Run → Editar → Variáveis.
+# NUNCA devem ser passadas como substitutions nem como build args.
+
+steps:
+  # 1. Build da imagem Docker do worker
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-worker
+    dir: worker
+    args:
+      - build
+      - '-t'
+      - '${_IMAGE}:$SHORT_SHA'
+      - '-t'
+      - '${_IMAGE}:latest'
+      - '.'
+
+  # 2. Push da imagem com a tag do commit
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-worker-sha
+    args: ['push', '${_IMAGE}:$SHORT_SHA']
+
+  # 3. Push da tag :latest
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-worker-latest
+    args: ['push', '${_IMAGE}:latest']
+
+  # 4. Deploy no Cloud Run
+  # --set-env-vars apenas para variáveis NÃO sensíveis que variam por ambiente.
+  # As credenciais reais (keys, tokens) ficam nas env vars do serviço no console.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: deploy-worker
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_SERVICE}'
+      - '--image=${_IMAGE}:$SHORT_SHA'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=3'
+      - '--timeout=60'
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
