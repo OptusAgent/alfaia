@@ -314,3 +314,16 @@ async def provisionar_tenant_endpoint(body: ProvisionarTenantRequest):
         wl_modo=body.wl_modo,
     )
     return res
+
+
+@router.get("/observabilidade/alertas")
+async def consultar_alertas_endpoint(tenant_id: str = "tenant_piloto"):
+    """
+    Endpoint para consultar alertas operacionais ativos (§21.3, §18.2, AC 3, AC 4).
+    """
+    from app.services.observability_service import observability_service
+    return {
+        "sucesso": True,
+        "tenant_id": tenant_id,
+        "alertas": observability_service.checar_alertas_operacionais(tenant_id=tenant_id),
+    }
