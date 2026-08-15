@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Se estiver na Vercel, deixa o runtime padrao da Vercel.
-  // Se for Docker/Cloud Run/VPS local, ativa standalone.
-  output: undefined,
+  output: process.env.VERCEL ? undefined : "standalone",
+  transpilePackages: ["@supabase/ssr", "@supabase/supabase-js"],
   eslint: {
     ignoreDuringBuilds: true,
   },
