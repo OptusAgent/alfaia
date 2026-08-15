@@ -97,30 +97,15 @@ class ToolsRegistry:
             return {"sucesso": False, "erro": str(e), "acao": "abrir_transbordo"}
 
     def buscar_produtos(self, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
-        # Em modo mock (Épico 5), retorna itens fictícios válidos de catálogo
         params = BuscarProdutosInput(**args)
+        tenant_id = ctx.get("tenant_id", "tenant_piloto")
         logger.info(f"Tool 'buscar_produtos' executada [params={params.model_dump(exclude_none=True)}]")
-        return {
-            "sucesso": True,
-            "produtos": [
-                {
-                    "ref": "V-101",
-                    "nome": "Vestido Longo Champanhe Sereia",
-                    "tamanho": params.tamanho or "42",
-                    "cor": params.cor or "Champanhe",
-                    "valor_aluguel": 520.0,
-                    "disponivel": True,
-                },
-                {
-                    "ref": "V-102",
-                    "nome": "Vestido Longo Marsala Fluido",
-                    "tamanho": params.tamanho or "42",
-                    "cor": "Marsala",
-                    "valor_aluguel": 480.0,
-                    "disponivel": True,
-                },
-            ],
-        }
+
+        from app.services.product_search_service import product_search_service
+        return product_search_service.buscar_produtos_com_cache(
+            tenant_id=tenant_id,
+            params=params.model_dump(exclude_none=True),
+        )
 
     def consultar_slots(self, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         params = ConsultarSlotsInput(**args)
