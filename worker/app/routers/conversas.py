@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.services.handoff_service import handoff_service
 
@@ -140,3 +140,40 @@ async def obter_base_contatos(
         "total": len(contatos),
         "contatos": contatos,
     }
+
+
+class PreviaCampanhaRequest(BaseModel):
+    tenant_id: str = "tenant_piloto"
+    segmento: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/campanhas/previa")
+async def gerar_previa_campanha_endpoint(body: PreviaCampanhaRequest):
+    """
+    Endpoint para geração de prévia de campanha com contagem exata e amostra sem opt-out (PRD §15.2, §18.2, AC 1-3).
+    """
+    from app.services.campanha_service import campanha_service
+    return campanha_service.gerar_previa_campanha(tenant_id=body.tenant_id, segmento=body.segmento)
+
+
+class CriarCampanhaRequest(BaseModel):
+    nome: str
+    tenant_id: str = "tenant_piloto"
+    segmento: dict[str, Any] = Field(default_factory=dict)
+    mensagem_id: str | None = None
+    agendada_para: str | None = None
+
+
+@router.post("/campanhas")
+async def criar_campanha_endpoint(body: CriarCampanhaRequest):
+    """
+    Endpoint para criação de rascunho de campanha (PRD §17.8, §18.2, Task 4).
+    """
+    from app.services.campanha_service import campanha_service
+    return campanha_service.criar_campanha_rascunho(
+        tenant_id=body.tenant_id,
+        nome=body.nome,
+        segmento=body.segmento,
+        mensagem_id=body.mensagem_id,
+        agendada_para=body.agendada_para,
+    )
