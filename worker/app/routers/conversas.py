@@ -254,3 +254,39 @@ async def atualizar_ia_config_endpoint(body: AtualizarIaConfigRequest, user_role
     if not res.get("sucesso"):
         raise HTTPException(status_code=res.get("status_code", 400), detail=res.get("erro"))
     return res
+
+
+@router.get("/automacoes")
+async def listar_automacoes_endpoint(tenant_id: str = "tenant_piloto"):
+    """
+    Endpoint para listagem do status das 8 automações do tenant (PRD §16, §18.2, AC 1).
+    """
+    from app.services.automacao_service import automacao_service
+    return {
+        "sucesso": True,
+        "tenant_id": tenant_id,
+        "automacoes": automacao_service.listar_automacoes(tenant_id=tenant_id),
+    }
+
+
+class AlterarAutomacaoRequest(BaseModel):
+    ativo: bool
+    tenant_id: str = "tenant_piloto"
+
+
+@router.patch("/automacoes/{chave}")
+async def alterar_automacao_endpoint(chave: str, body: AlterarAutomacaoRequest, user_role: str = "operador"):
+    """
+    Endpoint para alterar o toggle de uma automação (PRD §16, §18.2, AC 2, AC 4).
+    Apenas perfis 'dono' e 'operador' podem alterar. 'identificacao' não pode ser desativada.
+    """
+    from app.services.automacao_service import automacao_service
+    res = automacao_service.alterar_status_automacao(
+        tenant_id=body.tenant_id,
+        chave=chave,
+        ativo=body.ativo,
+        user_role=user_role,
+    )
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=res.get("status_code", 400), detail=res.get("erro"))
+    return res
