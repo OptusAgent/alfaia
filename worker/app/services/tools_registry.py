@@ -109,20 +109,39 @@ class ToolsRegistry:
 
     def consultar_slots(self, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         params = ConsultarSlotsInput(**args)
+        tenant_id = ctx.get("tenant_id", "tenant_piloto")
         logger.info(f"Tool 'consultar_slots' executada [params={params.model_dump()}]")
-        return {
-            "sucesso": True,
-            "slots": ["09:00", "11:00", "14:00", "16:00"],
-        }
+
+        from app.services.scheduling_service import scheduling_service
+        return scheduling_service.consultar_slots(
+            tenant_id=tenant_id,
+            tipo=params.tipo,
+            data_inicio=params.data_inicio,
+            data_fim=params.data_fim,
+        )
 
     def agendar(self, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         params = AgendarInput(**args)
+        tenant_id = ctx.get("tenant_id", "tenant_piloto")
+        lead = ctx.get("lead")
+        lead_id = lead.id if lead else "lead_piloto"
+        cliente_nome = lead.nome if hasattr(lead, "nome") and lead.nome else "Lead ALFAIA"
+        cliente_telefone = lead.telefone if hasattr(lead, "telefone") and lead.telefone else "5585988112233"
+
         logger.info(f"Tool 'agendar' executada [params={params.model_dump()}]")
-        return {
-            "sucesso": True,
-            "agendamento_id": "ag_999",
-            "mensagem": f"Agendamento de {params.tipo} confirmado para {params.data} às {params.hora}.",
-        }
+
+        from app.services.scheduling_service import scheduling_service
+        return scheduling_service.agendar_prova_ou_retirada(
+            tenant_id=tenant_id,
+            lead_id=lead_id,
+            tipo=params.tipo,
+            data=params.data,
+            hora=params.hora,
+            cliente_nome=cliente_nome,
+            cliente_telefone=cliente_telefone,
+            produto_ref=params.produto_ref,
+            observacao=params.observacao,
+        )
 
     def atualizar_lead(self, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         params = AtualizarLeadInput(**args)
