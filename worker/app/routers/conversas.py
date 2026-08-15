@@ -113,3 +113,30 @@ async def disparar_followup_endpoint(lead_id: str, body: DispararFollowupRequest
     if not res.get("sucesso"):
         raise HTTPException(status_code=res.get("status_code", 400), detail=res.get("erro"))
     return res
+
+
+@router.get("/contatos")
+async def obter_base_contatos(
+    tenant_id: str = "tenant_piloto",
+    tipo_evento: str | None = None,
+    papel: str | None = None,
+    status_final_lead: str | None = None,
+    tag: str | None = None,
+):
+    """
+    Endpoint de consulta da base permanente de contatos com segmentação para remarketing (PRD §15.1, §18.2, AC 1-4).
+    """
+    from app.services.contato_segmentacao_service import contato_segmentacao_service
+    contatos = contato_segmentacao_service.buscar_contatos_segmentados(
+        tenant_id=tenant_id,
+        tipo_evento=tipo_evento,
+        papel=papel,
+        status_final_lead=status_final_lead,
+        tag=tag,
+    )
+    return {
+        "sucesso": True,
+        "tenant_id": tenant_id,
+        "total": len(contatos),
+        "contatos": contatos,
+    }
