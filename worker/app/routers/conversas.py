@@ -217,3 +217,40 @@ async def retomar_campanha_endpoint(campanha_id: str):
     if not res.get("sucesso"):
         raise HTTPException(status_code=400, detail=res.get("erro"))
     return res
+
+
+@router.get("/ia-config")
+async def obter_ia_config_endpoint(tenant_id: str = "tenant_piloto"):
+    """
+    Endpoint para consultar as configurações de IA do tenant (PRD §17.9, §18.2).
+    """
+    from app.services.ia_config_service import ia_config_service
+    return ia_config_service.obter_config(tenant_id=tenant_id)
+
+
+class AtualizarIaConfigRequest(BaseModel):
+    tenant_id: str = "tenant_piloto"
+    persona_nome: str | None = None
+    prompt_sistema: str | None = None
+    modelo: str | None = None
+    temperatura: float | None = None
+    janela_retomada_dias: int | None = None
+    janela_silencio_horas: int | None = None
+    max_tentativas_followup: int | None = None
+    intervalo_tentativas_horas: int | None = None
+    disparo_followup_automatico: bool | None = None
+    pausa_transbordo_minutos: int | None = None
+
+
+@router.patch("/ia-config")
+async def atualizar_ia_config_endpoint(body: AtualizarIaConfigRequest, user_role: str = "operador"):
+    """
+    Endpoint para atualização de parâmetros de ia_config (PRD §17.9, §18.2, AC 3).
+    Apenas o perfil 'operador' possui permissão de escrita.
+    """
+    from app.services.ia_config_service import ia_config_service
+    updates = {k: v for k, v in body.model_dump().items() if v is not None and k != "tenant_id"}
+    res = ia_config_service.atualizar_config(tenant_id=body.tenant_id, updates=updates, user_role=user_role)
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=res.get("status_code", 400), detail=res.get("erro"))
+    return res
