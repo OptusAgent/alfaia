@@ -290,3 +290,27 @@ async def alterar_automacao_endpoint(chave: str, body: AlterarAutomacaoRequest, 
     if not res.get("sucesso"):
         raise HTTPException(status_code=res.get("status_code", 400), detail=res.get("erro"))
     return res
+
+
+class ProvisionarTenantRequest(BaseModel):
+    nome_loja: str
+    dono_email: str
+    dono_nome: str
+    canal_tipo: str = "uazapi"
+    wl_modo: str = "mock"
+
+
+@router.post("/tenants/onboarding")
+async def provisionar_tenant_endpoint(body: ProvisionarTenantRequest):
+    """
+    Endpoint para provisionamento transacional guiado de novos tenants (PRD §4.1, §17.2, §18.2, AC 1-5).
+    """
+    from app.services.tenant_onboarding_service import tenant_onboarding_service
+    res = tenant_onboarding_service.provisionar_tenant_completo(
+        nome_loja=body.nome_loja,
+        dono_email=body.dono_email,
+        dono_nome=body.dono_nome,
+        canal_tipo=body.canal_tipo,
+        wl_modo=body.wl_modo,
+    )
+    return res

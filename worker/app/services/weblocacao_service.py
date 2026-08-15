@@ -128,8 +128,17 @@ class WebLocacaoService:
     def __init__(self):
         self.mock_adapter = WLMockAdapter()
         self.chamadas_log: list[dict[str, Any]] = []
+        self.modos_tenant: dict[str, str] = {}
 
-    def _obter_modo(self) -> str:
+    def configurar_modo_tenant(self, tenant_id: str, modo: str = "mock") -> dict[str, Any]:
+        """Configura o modo de integração (mock/real) para o tenant (I8, AC 3)."""
+        self.modos_tenant[tenant_id] = modo
+        logger.info(f"Modo de integração WebLocação configurado [tenant={tenant_id}, modo='{modo}']")
+        return {"sucesso": True, "tenant_id": tenant_id, "modo": modo}
+
+    def _obter_modo(self, tenant_id: str | None = None) -> str:
+        if tenant_id and tenant_id in self.modos_tenant:
+            return self.modos_tenant[tenant_id].lower()
         return os.getenv("WL_MODO", "mock").lower()
 
     def registrar_chamada(self, tenant_id: str, metodo: str, rota: str, status_code: int, latencia_ms: int, erro: str | None = None):
