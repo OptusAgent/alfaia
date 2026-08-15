@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import webhooks, conversas
+from app.routers import webhooks, conversas, agenda
 
 app = FastAPI(
     title="ALFAIA Worker Engine",
@@ -7,9 +7,10 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Inclui rotas de webhook e conversas/transbordo
+# Inclui rotas de webhook, conversas/transbordo e agenda
 app.include_router(webhooks.router)
 app.include_router(conversas.router)
+app.include_router(agenda.router)
 
 
 @app.get("/health")
