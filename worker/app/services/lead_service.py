@@ -46,8 +46,12 @@ class LeadEventoModel(BaseModel):
     tenant_id: str
     lead_id: str
     tipo: str
+    de: str | None = None
+    para: str | None = None
     autor: str = "sistema"
+    motivo: str | None = None
     detalhe: dict[str, Any] = Field(default_factory=dict)
+    criado_em: datetime = Field(default_factory=datetime.now)
 
 
 class LeadService:

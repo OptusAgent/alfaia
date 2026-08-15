@@ -45,3 +45,21 @@ async def devolver_conversa_endpoint(conversa_id: str):
 
     conversa_atualizada = handoff_service.devolver_para_ia(conversa)
     return {"sucesso": True, "conversa": conversa_atualizada}
+
+
+@router.get("/leads/{lead_id}/eventos")
+async def obter_eventos_timeline_lead(lead_id: str):
+    """
+    Retorna o histórico cronológico de eventos do lead (PRD §10.4, §17.4, §18.2, AC 1, AC 3).
+    """
+    from app.services.lead_service import lead_service
+    eventos = [e.model_dump() for e in lead_service.eventos if getattr(e, "lead_id", None) == lead_id]
+    # Ordena por criado_em decrescente
+    eventos.sort(key=lambda x: x.get("criado_em", ""), reverse=True)
+
+    return {
+        "sucesso": True,
+        "lead_id": lead_id,
+        "total_eventos": len(eventos),
+        "eventos": eventos,
+    }
