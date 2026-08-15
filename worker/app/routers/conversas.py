@@ -63,3 +63,26 @@ async def obter_eventos_timeline_lead(lead_id: str):
         "total_eventos": len(eventos),
         "eventos": eventos,
     }
+
+
+class DescartarLeadRequest(BaseModel):
+    motivo: str
+    tenant_id: str = "tenant_piloto"
+    autor: str = "humano"
+
+
+@router.post("/leads/{lead_id}/descartar")
+async def descartar_lead_endpoint(lead_id: str, body: DescartarLeadRequest):
+    """
+    Endpoint para descarte de lead com retenção de dados e histórico (PRD §10.3, §18.2, AC 1, AC 4).
+    """
+    from app.services.lead_retention_service import lead_retention_service
+    res = lead_retention_service.descartar_lead(
+        tenant_id=body.tenant_id,
+        lead_id=lead_id,
+        motivo=body.motivo,
+        autor=body.autor,
+    )
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=400, detail=res.get("erro"))
+    return res
