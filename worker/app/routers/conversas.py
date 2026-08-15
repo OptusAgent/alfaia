@@ -177,3 +177,43 @@ async def criar_campanha_endpoint(body: CriarCampanhaRequest):
         mensagem_id=body.mensagem_id,
         agendada_para=body.agendada_para,
     )
+
+
+@router.post("/campanhas/{campanha_id}/iniciar")
+async def iniciar_campanha_endpoint(campanha_id: str):
+    """
+    Endpoint para iniciar a execução da campanha (PRD §18.2, K6).
+    """
+    from app.services.campanha_engine_service import campanha_engine_service
+    res = campanha_engine_service.iniciar_campanha(campanha_id=campanha_id)
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=400, detail=res.get("erro"))
+    return res
+
+
+class PausarCampanhaRequest(BaseModel):
+    motivo: str = "Pausa manual pelo lojista"
+
+
+@router.post("/campanhas/{campanha_id}/pausar")
+async def pausar_campanha_endpoint(campanha_id: str, body: PausarCampanhaRequest):
+    """
+    Endpoint para pausar a campanha em execução (PRD §18.2, K6, K8).
+    """
+    from app.services.campanha_engine_service import campanha_engine_service
+    res = campanha_engine_service.pausar_campanha(campanha_id=campanha_id, motivo=body.motivo)
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=400, detail=res.get("erro"))
+    return res
+
+
+@router.post("/campanhas/{campanha_id}/retomar")
+async def retomar_campanha_endpoint(campanha_id: str):
+    """
+    Endpoint para retomar a campanha pausada de onde parou (PRD §18.2, K6).
+    """
+    from app.services.campanha_engine_service import campanha_engine_service
+    res = campanha_engine_service.retomar_campanha(campanha_id=campanha_id)
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=400, detail=res.get("erro"))
+    return res
