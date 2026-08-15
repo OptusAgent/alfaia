@@ -8,6 +8,11 @@ export async function updateSession(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
 
+  // Se estiver usando URL placeholder (sem env vars configuradas), pula a checagem do Supabase no Edge
+  if (!url || url.includes("placeholder")) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll() {
@@ -25,18 +30,22 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const isPublicPath = PUBLIC_PATHS.some((path) =>
-    request.nextUrl.pathname.startsWith(path),
-  );
+    const isPublicPath = PUBLIC_PATHS.some((path) =>
+      request.nextUrl.pathname.startsWith(path),
+    );
 
-  if (!user && !isPublicPath) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
+    if (!user && !isPublicPath) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      return NextResponse.redirect(loginUrl);
+    }
+  } catch {
+    // Fallback silencioso em ambiente de build/preview sem conexão ativa
   }
 
   return supabaseResponse;
