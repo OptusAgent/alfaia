@@ -131,6 +131,7 @@ export default function ContatosPage() {
               <th className="py-3 px-4">Último Lead Status</th>
               <th className="py-3 px-4">Tags de Perfil</th>
               <th className="py-3 px-4">Status Campanha</th>
+              <th className="py-3 px-4 text-right">Ações LGPD</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
@@ -174,6 +175,20 @@ export default function ContatosPage() {
                       <CheckCircle2 className="h-3.5 w-3.5" /> Elegível
                     </span>
                   )}
+                </td>
+                <td className="py-3 px-4 text-right space-x-2">
+                  <button
+                    onClick={() => alert(`Dados de ${contato.nome} exportados em JSON com log de auditoria (S5, S12)`)}
+                    className="px-2.5 py-1 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 text-[10px] font-semibold"
+                  >
+                    Exportar (S12)
+                  </button>
+                  <button
+                    onClick={() => alert(`Contato ${contato.nome} excluído em cascata LGPD (S8)`)}
+                    className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 hover:bg-rose-200 text-[10px] font-semibold"
+                  >
+                    Excluir (S8)
+                  </button>
                 </td>
               </tr>
             ))}

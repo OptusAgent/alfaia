@@ -327,3 +327,37 @@ async def consultar_alertas_endpoint(tenant_id: str = "tenant_piloto"):
         "tenant_id": tenant_id,
         "alertas": observability_service.checar_alertas_operacionais(tenant_id=tenant_id),
     }
+
+
+@router.delete("/contatos/{contato_id}")
+async def excluir_contato_endpoint(contato_id: str, tenant_id: str = "tenant_piloto"):
+    """
+    Endpoint para exclusão em cascata LGPD de contato e todos os seus registros (S8, §22, AC 1).
+    """
+    from app.services.lgpd_service import lgpd_service
+    res = lgpd_service.excluir_contato_cascata(tenant_id=tenant_id, contato_id=contato_id)
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=res.get("status_code", 404), detail=res.get("erro"))
+    return res
+
+
+@router.get("/contatos/{contato_id}/exportar")
+async def exportar_dados_contato_endpoint(contato_id: str, tenant_id: str = "tenant_piloto", user_role: str = "dono"):
+    """
+    Endpoint para exportação auditada de dados do contato (S12, S5, §22, AC 2, AC 4).
+    Apenas perfis 'dono' e 'operador' podem exportar.
+    """
+    from app.services.lgpd_service import lgpd_service
+    res = lgpd_service.exportar_dados_contato(tenant_id=tenant_id, contato_id=contato_id, user_role=user_role)
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=res.get("status_code", 403), detail=res.get("erro"))
+    return res
+
+
+@router.post("/lgpd/expurgo-24m")
+async def expurgo_24m_endpoint(tenant_id: str = "tenant_piloto"):
+    """
+    Endpoint para executar job de retenção e anonimização de mensagens de 24 meses (S9, §22, AC 3).
+    """
+    from app.services.lgpd_service import lgpd_service
+    return lgpd_service.executar_expurgo_24_meses(tenant_id=tenant_id)
