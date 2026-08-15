@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Filter, Tag, CheckCircle2, XCircle, Search, RefreshCw } from "lucide-react";
+import { Badge } from "@/app/components/ui/Badge";
+import { Users, Filter, Tag, CheckCircle2, XCircle, Search } from "lucide-react";
 
 export interface ContatoItem {
   id: string;
@@ -55,50 +56,60 @@ export default function ContatosPage() {
   });
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-200 pb-5">
+      <div
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5"
+        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+      >
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 flex items-center gap-2.5">
-            <Users className="h-7 w-7 text-brand-600" />
+          <h1
+            className="text-2xl font-bold font-display flex items-center gap-2.5"
+            style={{ color: "var(--text-primary)" }}
+          >
+            <Users className="h-7 w-7" style={{ color: "var(--accent-primary)" }} />
             Base de Contatos & Remarketing
           </h1>
-          <p className="text-sm text-neutral-500 mt-1">
-            Repositório permanente de clientes com tags históricas para campanhas sazonais (PRD §15.1).
+          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+            Repositório permanente de clientes com tags históricas para campanhas sazonais.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-neutral-600 bg-neutral-100 px-3 py-1.5 rounded-lg border border-neutral-200">
-            Total na Base: <strong>{CONTATOS_MOCK.length} contatos</strong>
-          </span>
-        </div>
+        <Badge variant="neutral">
+          Total na Base: <strong>{CONTATOS_MOCK.length} contatos</strong>
+        </Badge>
       </div>
 
-      {/* Bar de Filtros / Segmentação (AC 2) */}
-      <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-2xs space-y-4">
-        <div className="flex items-center gap-2 text-xs font-bold text-neutral-800 uppercase tracking-wider">
-          <Filter className="h-4 w-4 text-brand-600" />
-          Filtros de Segmentação para Campanhas
+      {/* Filtros */}
+      <div className="glass-card p-4 space-y-4">
+        <div
+          className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <Filter className="h-4 w-4" style={{ color: "var(--accent-primary)" }} />
+          Filtros de Segmentação
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Busca por Nome/Telefone */}
+          {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
+              style={{ color: "var(--text-muted)" }}
+            />
             <input
               type="text"
               placeholder="Buscar por nome ou telefone..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-neutral-300 focus:outline-hidden focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              className="glass-input pl-9 text-xs"
             />
           </div>
 
-          {/* Filtro por Status do Úlitmo Lead */}
+          {/* Status Filter */}
           <select
             value={filtroStatus}
             onChange={(e) => setFiltroStatus(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-300 focus:outline-hidden focus:border-brand-500 focus:ring-1 focus:ring-brand-500 bg-white"
+            className="glass-select"
           >
             <option value="todos">Todos os Status de Lead</option>
             <option value="ganho">Ganho (Contrato Fechado)</option>
@@ -106,11 +117,11 @@ export default function ContatosPage() {
             <option value="negociando">Em Negociação</option>
           </select>
 
-          {/* Filtro por Tag */}
+          {/* Tag Filter */}
           <select
             value={filtroTag}
             onChange={(e) => setFiltroTag(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-300 focus:outline-hidden focus:border-brand-500 focus:ring-1 focus:ring-brand-500 bg-white"
+            className="glass-select"
           >
             <option value="todos">Todas as Tags</option>
             <option value="noiva">Noiva</option>
@@ -121,73 +132,86 @@ export default function ContatosPage() {
         </div>
       </div>
 
-      {/* Tabela de Contatos Segmentados (AC 1, AC 3) */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-2xs overflow-hidden">
-        <table className="w-full text-left text-xs border-collapse">
+      {/* Table */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+        }}
+      >
+        <table className="dark-table">
           <thead>
-            <tr className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
-              <th className="py-3 px-4">Nome do Contato</th>
-              <th className="py-3 px-4">Telefone</th>
-              <th className="py-3 px-4">Último Lead Status</th>
-              <th className="py-3 px-4">Tags de Perfil</th>
-              <th className="py-3 px-4">Status Campanha</th>
-              <th className="py-3 px-4 text-right">Ações LGPD</th>
+            <tr>
+              <th>Nome do Contato</th>
+              <th>Telefone</th>
+              <th>Último Lead Status</th>
+              <th>Tags de Perfil</th>
+              <th>Status Campanha</th>
+              <th className="text-right">Ações LGPD</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody>
             {contatosFiltrados.map((contato) => (
-              <tr key={contato.id} className="hover:bg-neutral-50/80 transition">
-                <td className="py-3 px-4 font-bold text-neutral-900">{contato.nome}</td>
-                <td className="py-3 px-4 font-mono text-neutral-600">{contato.telefone}</td>
-                <td className="py-3 px-4">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold text-[11px] ${
+              <tr key={contato.id}>
+                <td className="font-bold" style={{ color: "var(--text-primary)" }}>
+                  {contato.nome}
+                </td>
+                <td className="font-mono">{contato.telefone}</td>
+                <td>
+                  <Badge
+                    variant={
                       contato.ultimoLeadStatus === "ganho"
-                        ? "bg-emerald-100 text-emerald-800"
+                        ? "success"
                         : contato.ultimoLeadStatus === "descartado"
-                        ? "bg-rose-100 text-rose-800"
-                        : "bg-amber-100 text-amber-800"
-                    }`}
+                        ? "danger"
+                        : "warning"
+                    }
                   >
                     {contato.ultimoLeadStatus.toUpperCase()}
-                  </span>
+                  </Badge>
                 </td>
-                <td className="py-3 px-4">
+                <td>
                   <div className="flex flex-wrap gap-1">
                     {contato.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center gap-0.5 bg-neutral-100 text-neutral-700 border border-neutral-200 px-2 py-0.5 rounded-md text-[10px] font-medium"
+                        className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-medium"
+                        style={{
+                          background: "rgba(255, 255, 255, 0.06)",
+                          color: "var(--text-secondary)",
+                          border: "1px solid rgba(255, 255, 255, 0.06)",
+                        }}
                       >
-                        <Tag className="h-2.5 w-2.5 text-neutral-500" />
+                        <Tag className="h-2.5 w-2.5" style={{ color: "var(--text-muted)" }} />
                         {tag}
                       </span>
                     ))}
                   </div>
                 </td>
-                <td className="py-3 px-4">
+                <td>
                   {contato.optOut ? (
-                    <span className="inline-flex items-center gap-1 text-rose-600 font-semibold text-[11px]">
-                      <XCircle className="h-3.5 w-3.5" /> Opt-Out
-                    </span>
+                    <Badge variant="danger" icon={<XCircle className="h-3 w-3" />}>
+                      Opt-Out
+                    </Badge>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold text-[11px]">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Elegível
-                    </span>
+                    <Badge variant="success" icon={<CheckCircle2 className="h-3 w-3" />}>
+                      Elegível
+                    </Badge>
                   )}
                 </td>
-                <td className="py-3 px-4 text-right space-x-2">
+                <td className="text-right space-x-2">
                   <button
-                    onClick={() => alert(`Dados de ${contato.nome} exportados em JSON com log de auditoria (S5, S12)`)}
-                    className="px-2.5 py-1 rounded bg-neutral-100 text-neutral-700 hover:bg-neutral-200 text-[10px] font-semibold"
+                    onClick={() => alert(`Dados de ${contato.nome} exportados em JSON com log de auditoria`)}
+                    className="glass-btn glass-btn-ghost text-[10px] px-2.5 py-1"
                   >
-                    Exportar (S12)
+                    Exportar
                   </button>
                   <button
-                    onClick={() => alert(`Contato ${contato.nome} excluído em cascata LGPD (S8)`)}
-                    className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 hover:bg-rose-200 text-[10px] font-semibold"
+                    onClick={() => alert(`Contato ${contato.nome} excluído em cascata LGPD`)}
+                    className="glass-btn glass-btn-danger text-[10px] px-2.5 py-1"
                   >
-                    Excluir (S8)
+                    Excluir
                   </button>
                 </td>
               </tr>

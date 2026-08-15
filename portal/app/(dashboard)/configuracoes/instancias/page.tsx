@@ -1,10 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { QrCode, Plus, Trash2, Edit3, CheckCircle2, AlertCircle, RefreshCw, Server, ShieldCheck } from "lucide-react";
+import { QrCode, Plus, Trash2, CheckCircle2, AlertCircle, Server, ShieldCheck } from "lucide-react";
+
+interface InstanciaItem {
+  id: string;
+  nome: string;
+  base_url: string;
+  token: string;
+  status: string;
+}
 
 export default function InstanciasUazapiPage() {
-  const [instancias, setInstancias] = useState([
+  const [instancias, setInstancias] = useState<InstanciaItem[]>([
     {
       id: "inst_piloto",
       nome: "Instância WhatsApp Piloto (UAZAPI)",
@@ -16,7 +24,7 @@ export default function InstanciasUazapiPage() {
 
   const [modalAberta, setModalAberta] = useState(false);
   const [modalQrAberta, setModalQrAberta] = useState(false);
-  const [instanciaQr, setInstanciaQr] = useState<any | null>(null);
+  const [instanciaQr, setInstanciaQr] = useState<InstanciaItem | null>(null);
 
   const [nome, setNome] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://api.uazapi.com");
@@ -43,7 +51,7 @@ export default function InstanciasUazapiPage() {
     }
   };
 
-  const handleGerarQr = (inst: any) => {
+  const handleGerarQr = (inst: InstanciaItem) => {
     setInstanciaQr(inst);
     setModalQrAberta(true);
   };

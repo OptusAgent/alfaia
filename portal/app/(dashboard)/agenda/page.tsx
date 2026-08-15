@@ -2,20 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Badge } from "@/app/components/ui/Badge";
 import { Calendar, Filter, RefreshCw, Info, ExternalLink, Clock, Tag } from "lucide-react";
 
 interface Agendamento {
-  id: str;
-  wl_agendamento_id: str;
-  lead_id: str;
-  tipo: str;
-  data: str;
-  hora: str;
-  cliente_nome: str;
-  cliente_telefone: str;
-  produto_ref?: str;
+  id: string;
+  wl_agendamento_id: string;
+  lead_id: string;
+  tipo: string;
+  data: string;
+  hora: string;
+  cliente_nome: string;
+  cliente_telefone: string;
+  produto_ref?: string;
   origem: "automacao" | "loja";
-  status: str;
+  status: string;
 }
 
 const MOCK_AGENDAMENTOS: Agendamento[] = [
@@ -79,22 +80,34 @@ export default function AgendaPage() {
 
   return (
     <section aria-labelledby="agenda-title" className="space-y-6">
-      {/* Top Banner de Aviso Fixo Visível sem Scroll (AC 4, AC 11.4) */}
-      <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm">
-        <Info className="h-5 w-5 flex-shrink-0 text-amber-600" />
-        <div className="text-sm font-medium">
-          <strong>Aviso de Integração WebLocação:</strong> Esta tela é <u>somente leitura</u>. Qualquer alteração ou cancelamento de agendamento deve ser efetuado diretamente no portal da WebLocação.
+      {/* Warning Banner */}
+      <div
+        className="flex items-center gap-3 rounded-xl p-4"
+        style={{
+          background: "var(--accent-amber-muted)",
+          border: "1px solid var(--accent-amber-border)",
+        }}
+      >
+        <Info className="h-5 w-5 flex-shrink-0" style={{ color: "var(--accent-amber)" }} />
+        <div className="text-sm font-medium" style={{ color: "var(--accent-amber)" }}>
+          <strong>Aviso de Integração WebLocação:</strong> Esta tela é{" "}
+          <u>somente leitura</u>. Alterações devem ser efetuadas no portal da
+          WebLocação.
         </div>
       </div>
 
-      {/* Header com Título e Botão de Sincronização */}
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 id="agenda-title" className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-brand-600" />
+          <h1
+            id="agenda-title"
+            className="text-xl font-bold font-display flex items-center gap-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            <Calendar className="h-6 w-6" style={{ color: "var(--accent-primary)" }} />
             Agenda de Atendimentos
           </h1>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Sincronização bidirecional em tempo real com a WebLocação ERP.
           </p>
         </div>
@@ -103,24 +116,31 @@ export default function AgendaPage() {
           id="btn-sync-agenda"
           onClick={handleSync}
           disabled={isSyncing}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
+          className="glass-btn glass-btn-primary"
         >
           <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
           {isSyncing ? "Sincronizando..." : "Sincronizar Agora"}
         </button>
       </div>
 
-      {/* Seletor de Período e Filtro de Origem (AC 1, AC 11.1) */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-1 rounded-lg bg-neutral-100 p-1 text-xs font-semibold text-neutral-700">
+      {/* Period Selector + Origin Filter */}
+      <div
+        className="glass-card p-4 flex flex-wrap items-center justify-between gap-4"
+      >
+        <div
+          className="flex items-center gap-1 rounded-lg p-1 text-xs font-semibold"
+          style={{ background: "rgba(0, 0, 0, 0.2)" }}
+        >
           {(["dia", "semana", "mes", "custom"] as const).map((p) => (
             <button
               key={p}
               id={`btn-periodo-${p}`}
               onClick={() => setPeriodo(p)}
-              className={`rounded-md px-3 py-1.5 capitalize transition ${
-                periodo === p ? "bg-white text-brand-700 shadow-sm" : "hover:text-neutral-900"
-              }`}
+              className="rounded-md px-3 py-1.5 capitalize transition-all"
+              style={{
+                background: periodo === p ? "var(--accent-primary-muted)" : "transparent",
+                color: periodo === p ? "var(--accent-primary)" : "var(--text-muted)",
+              }}
             >
               {p === "mes" ? "Mês" : p === "custom" ? "Customizado" : p}
             </button>
@@ -128,13 +148,16 @@ export default function AgendaPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Filter className="h-4 w-4 text-neutral-400" />
-          <span className="text-xs font-medium text-neutral-500">Origem:</span>
+          <Filter className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+          <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+            Origem:
+          </span>
           <select
             id="select-filtro-origem"
             value={filtroOrigem}
-            onChange={(e) => setFiltroOrigem(e.target.value as any)}
-            className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-800 focus:border-brand-500 focus:outline-none"
+            onChange={(e) => setFiltroOrigem(e.target.value as typeof filtroOrigem)}
+            className="glass-select"
+            style={{ width: "auto" }}
           >
             <option value="todas">Todas as origens</option>
             <option value="automacao">Automação (IA)</option>
@@ -143,56 +166,69 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* Tabela de Agendamentos */}
-      <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm text-neutral-700">
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+      {/* Table */}
+      <div
+        className="overflow-hidden rounded-xl"
+        style={{
+          background: "rgba(255, 255, 255, 0.02)",
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+        }}
+      >
+        <table className="dark-table">
+          <thead>
             <tr>
-              <th className="px-6 py-3">Data e Hora</th>
-              <th className="px-6 py-3">Cliente / Lead</th>
-              <th className="px-6 py-3">Tipo</th>
-              <th className="px-6 py-3">Produto Ref</th>
-              <th className="px-6 py-3">Origem</th>
-              <th className="px-6 py-3 text-right">Ação</th>
+              <th>Data e Hora</th>
+              <th>Cliente / Lead</th>
+              <th>Tipo</th>
+              <th>Produto Ref</th>
+              <th>Origem</th>
+              <th className="text-right">Ação</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200">
+          <tbody>
             {agendamentosFiltrados.map((ag) => (
-              <tr key={ag.id} className="hover:bg-neutral-50/80 transition">
-                <td className="px-6 py-4 font-medium text-neutral-900">
+              <tr key={ag.id}>
+                <td className="font-medium" style={{ color: "var(--text-primary)" }}>
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-neutral-400" />
+                    <Clock className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
                     <span>{ag.data} às {ag.hora}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4">
-                  <div className="font-semibold text-neutral-900">{ag.cliente_nome}</div>
-                  <div className="text-xs text-neutral-500">{ag.cliente_telefone}</div>
+                <td>
+                  <div className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {ag.cliente_nome}
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {ag.cliente_telefone}
+                  </div>
                 </td>
-                <td className="px-6 py-4 capitalize">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700">
-                    <Tag className="h-3 w-3 text-neutral-400" />
+                <td className="capitalize">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.06)",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    <Tag className="h-3 w-3" style={{ color: "var(--text-muted)" }} />
                     {ag.tipo}
                   </span>
                 </td>
-                <td className="px-6 py-4 font-mono text-xs text-neutral-600">
+                <td className="font-mono text-xs">
                   {ag.produto_ref || "—"}
                 </td>
-                <td className="px-6 py-4">
+                <td>
                   {ag.origem === "automacao" ? (
-                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                      Automação
-                    </span>
+                    <Badge variant="success">Automação</Badge>
                   ) : (
-                    <span className="inline-flex items-center rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-800">
-                      Loja / ERP
-                    </span>
+                    <Badge variant="neutral">Loja / ERP</Badge>
                   )}
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="text-right">
                   <Link
                     href={`/conversas?lead_id=${ag.lead_id}`}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-800 hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-semibold hover:underline"
+                    style={{ color: "var(--accent-primary)" }}
                   >
                     Ver Lead <ExternalLink className="h-3.5 w-3.5" />
                   </Link>

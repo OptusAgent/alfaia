@@ -6,6 +6,23 @@ import { NAV_ITEMS } from "@/lib/nav";
 import { TenantSwitcher } from "./tenant-switcher";
 import { signOut } from "./sign-out-action";
 import { createClient } from "@/lib/supabase/server";
+import {
+  LayoutGrid,
+  MessageSquare,
+  CalendarDays,
+  Users,
+  Settings,
+  LogOut,
+  Zap,
+} from "lucide-react";
+
+const NAV_ICONS: Record<string, React.ReactNode> = {
+  "/kanban": <LayoutGrid className="h-4 w-4" />,
+  "/conversas": <MessageSquare className="h-4 w-4" />,
+  "/agenda": <CalendarDays className="h-4 w-4" />,
+  "/contatos": <Users className="h-4 w-4" />,
+  "/configuracoes": <Settings className="h-4 w-4" />,
+};
 
 export default async function DashboardLayout({
   children,
@@ -24,14 +41,27 @@ export default async function DashboardLayout({
 
   if (memberships.length === 0) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6 text-center bg-[#F3F6F9]">
-        <div className="max-w-md rounded-2xl border border-[#CBD5E1] bg-white p-8 shadow-sm">
-          <h2 className="font-serif text-xl font-bold text-[#072F53] mb-2">Conta Sem Organização</h2>
-          <p className="text-sm text-slate-600">
-            Sua conta ainda não está associada a nenhum tenant. Fale com o operador responsável pelo seu acesso.
+      <main
+        className="flex min-h-screen items-center justify-center p-6 text-center"
+        style={{ backgroundColor: "var(--bg-primary)" }}
+      >
+        <div className="glass-card-elevated max-w-md p-8">
+          <h2
+            className="font-display text-xl font-bold mb-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Conta Sem Organização
+          </h2>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Sua conta ainda não está associada a nenhum tenant. Fale com o
+            operador responsável pelo seu acesso.
           </p>
           <form action={signOut} className="mt-4">
-            <button type="submit" className="text-sm text-blue-600 hover:underline">
+            <button
+              type="submit"
+              className="text-sm font-medium hover:underline"
+              style={{ color: "var(--accent-primary)" }}
+            >
               Sair da conta
             </button>
           </form>
@@ -46,96 +76,163 @@ export default async function DashboardLayout({
   const visibility = await Promise.all(
     NAV_ITEMS.map(async (item) => {
       const checks = await Promise.all(
-        item.anyOf.map((c) => hasPermission(activeTenant.tenant_id, c.recurso, c.acao)),
+        item.anyOf.map((c) =>
+          hasPermission(activeTenant.tenant_id, c.recurso, c.acao)
+        )
       );
       return checks.some(Boolean);
-    }),
+    })
   );
   const visibleNavItems = NAV_ITEMS.filter((_, i) => visibility[i]);
 
   return (
-    <div className="flex min-h-screen bg-[#F3F6F9] text-[#1F1B17]">
-      {/* Sidebar - Exact Navy Blue Design System from /frontend */}
-      <aside className="w-64 bg-gradient-to-b from-[#072F53] via-[#0E4A7B] to-[#083358] text-white flex flex-col h-screen sticky top-0 border-r border-[#1868A8]/30 shadow-xl shrink-0 z-20">
+    <div className="flex min-h-screen" style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>
+      {/* ━━━ Sidebar ━━━ */}
+      <aside
+        className="w-64 flex flex-col h-screen sticky top-0 shrink-0 z-20"
+        style={{
+          backgroundColor: "var(--bg-secondary)",
+          borderRight: "1px solid rgba(255, 255, 255, 0.06)",
+        }}
+      >
         {/* Logo Header */}
-        <div className="p-5 border-b border-[#1868A8]/30">
+        <div
+          className="p-5"
+          style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#EBB832] to-[#A67C2E] flex items-center justify-center shadow-lg text-[#072F53] font-bold">
-              <svg className="w-5 h-5 text-[#072F53] fill-current" viewBox="0 0 24 24">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{
+                background: "linear-gradient(135deg, var(--accent-primary) 0%, #059669 100%)",
+                boxShadow: "var(--shadow-glow-teal)",
+              }}
+            >
+              <svg className="h-5 w-5 fill-current text-black" viewBox="0 0 24 24">
                 <path d="M12 2L2 19h20L12 2zm0 4l6.5 11h-13L12 6z" />
               </svg>
             </div>
             <div>
-              <h1 className="font-serif text-2xl font-normal tracking-wider text-white leading-none">
+              <h1
+                className="font-display text-xl font-semibold tracking-wide leading-none"
+                style={{ color: "var(--text-primary)" }}
+              >
                 ALFAIA
               </h1>
-              <span className="font-mono text-[9px] uppercase tracking-widest text-[#EBB832] font-semibold block mt-1">
+              <span
+                className="font-mono text-[9px] uppercase tracking-widest font-semibold block mt-0.5"
+                style={{ color: "var(--accent-primary)" }}
+              >
                 Atendimento + CRM
               </span>
             </div>
           </div>
         </div>
 
-        {/* User Avatar Card */}
-        <div className="mx-3 my-3 p-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center gap-3">
+        {/* User Card */}
+        <div
+          className="mx-3 my-3 p-3 rounded-xl flex items-center gap-3"
+          style={{
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.06)",
+          }}
+        >
           <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#EBB832] to-[#F2E7D0] text-[#072F53] font-bold flex items-center justify-center text-sm shadow">
+            <div
+              className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold"
+              style={{
+                background: "linear-gradient(135deg, var(--accent-primary) 0%, #059669 100%)",
+                color: "#000",
+              }}
+            >
               {user.email?.substring(0, 2).toUpperCase()}
             </div>
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#072F53]"></span>
+            <span
+              className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full"
+              style={{
+                backgroundColor: "var(--accent-primary)",
+                border: "2px solid var(--bg-secondary)",
+              }}
+            />
           </div>
           <div className="min-w-0 flex-1">
-            <b className="block text-xs font-semibold text-white truncate">{user.email}</b>
-            <div className="flex items-center gap-0.5 mt-0.5 text-[#EBB832]">
-              {[...Array(5)].map((_, i) => (
-                <svg key={i} className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                </svg>
-              ))}
-            </div>
-            <span className="text-[10px] text-slate-300 font-mono block truncate">
+            <b
+              className="block text-xs font-semibold truncate"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {user.email}
+            </b>
+            <span
+              className="font-mono text-[10px] block truncate"
+              style={{ color: "var(--text-muted)" }}
+            >
               {activeTenant.papel.toUpperCase()}
             </span>
           </div>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="px-3 py-2 flex-1 overflow-y-auto space-y-1" aria-label="Navegação principal">
-          <div className="font-mono text-[9px] uppercase tracking-widest text-slate-300 px-3 pt-2 pb-1 font-semibold opacity-80">
-            Operação & Módulos
+        {/* Navigation */}
+        <nav className="px-3 py-2 flex-1 overflow-y-auto space-y-0.5" aria-label="Navegação principal">
+          <div
+            className="font-mono text-[9px] uppercase tracking-widest px-3 pt-3 pb-2 font-semibold"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Módulos
           </div>
           {visibleNavItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all group"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group"
+              style={{ color: "var(--text-secondary)" }}
             >
-              <span>{item.label}</span>
+              <span
+                className="group-hover:text-[var(--accent-primary)] transition-colors"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {NAV_ICONS[item.href] || <Zap className="h-4 w-4" />}
+              </span>
+              <span className="group-hover:text-[var(--text-primary)] transition-colors">
+                {item.label}
+              </span>
             </Link>
           ))}
         </nav>
 
-        {/* Sidebar Footer / Tenant Switcher & Sign Out */}
-        <div className="p-3 border-t border-[#1868A8]/30 space-y-2 bg-[#072F53]/40">
+        {/* Footer */}
+        <div
+          className="p-3 space-y-2"
+          style={{
+            borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+            background: "rgba(0, 0, 0, 0.15)",
+          }}
+        >
           <div className="text-xs px-1">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-slate-300 block mb-1">
-              Loja / Tenant Ativo
+            <span
+              className="font-mono text-[9px] uppercase tracking-widest block mb-1"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Tenant Ativo
             </span>
-            <TenantSwitcher memberships={memberships} activeTenantId={activeTenant.tenant_id} />
+            <TenantSwitcher
+              memberships={memberships}
+              activeTenantId={activeTenant.tenant_id}
+            />
           </div>
 
           <form action={signOut}>
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-all cursor-pointer border border-white/10"
+              className="glass-btn glass-btn-ghost w-full text-xs gap-2 py-2 cursor-pointer"
             >
+              <LogOut className="h-3.5 w-3.5" />
               Encerrar Sessão
             </button>
           </form>
         </div>
       </aside>
 
-      {/* Main Workspace Content */}
+      {/* ━━━ Main Content ━━━ */}
       <main className="flex-1 min-w-0 flex flex-col min-h-screen">
         <div className="flex-1 p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
           {children}

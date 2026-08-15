@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { Megaphone, Users, Eye, FileText, CheckCircle2, ArrowRight, ShieldCheck } from "lucide-react";
 
+interface AmostraItem {
+  id: string;
+  nome: string;
+  telefone: string;
+  tags: string[];
+}
+
 export default function NovaCampanhaPage() {
   const [passo, setPasso] = useState<number>(1);
   const [nomeCampanha, setNomeCampanha] = useState<string>("Campanha Noivas Primavera 2026");
@@ -11,9 +18,9 @@ export default function NovaCampanhaPage() {
 
   // State da prévia
   const [carregandoPrevia, setCarregandoPrevia] = useState(false);
-  const [totalElegiveis, setTotalElegiveis] = useState<number>(142);
-  const [optoutExcluidos, setOptoutExcluidos] = useState<number>(18);
-  const [amostra, setAmostra] = useState<any[]>([
+  const [totalElegiveis] = useState<number>(142);
+  const [optoutExcluidos] = useState<number>(18);
+  const [amostra] = useState<AmostraItem[]>([
     { id: "c_1", nome: "Mariana Souza", telefone: "5585999887766", tags: ["noiva", "outubro_2026"] },
     { id: "c_2", nome: "Fernanda Silva", telefone: "5585988776655", tags: ["noiva", "vestido_sereia"] },
     { id: "c_3", nome: "Juliana Paes", telefone: "5585977665544", tags: ["noiva", "madrinha"] },
@@ -47,7 +54,7 @@ export default function NovaCampanhaPage() {
           Nova Campanha de Reengajamento
         </h1>
         <p className="text-sm text-neutral-500 mt-1">
-          Defina o público alvo, confira a prévia de contatos elegíveis e configure sua mensagem (PRD §15.2).
+          Defina o público alvo, confira a prévia de contatos elegíveis e configure sua mensagem.
         </p>
       </div>
 
@@ -74,7 +81,7 @@ export default function NovaCampanhaPage() {
           <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto" />
           <h2 className="text-xl font-bold text-emerald-900">Campanha Salva como Rascunho!</h2>
           <p className="text-xs text-emerald-700">
-            Sua campanha "<strong>{nomeCampanha}</strong>" foi salva com {totalElegiveis} contatos elegíveis pré-aprovados.
+            Sua campanha &quot;<strong>{nomeCampanha}</strong>&quot; foi salva com {totalElegiveis} contatos elegíveis pré-aprovados.
           </p>
         </div>
       ) : (

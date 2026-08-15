@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Badge } from "@/app/components/ui/Badge";
 import { Send, AlertTriangle, CheckCircle, X, ShieldAlert } from "lucide-react";
 
 export interface MensagemTemplate {
@@ -13,7 +14,7 @@ export interface MensagemTemplate {
 interface FollowupDispatchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  leadId: string;
+  leadId?: string;
   nomeLead: string;
   canalAtivo: "uazapi" | "meta";
   janelaMetaAberta: boolean;
@@ -39,7 +40,6 @@ const TEMPLATES_PADRAO: MensagemTemplate[] = [
 export default function FollowupDispatchModal({
   isOpen,
   onClose,
-  leadId,
   nomeLead,
   canalAtivo,
   janelaMetaAberta,
@@ -77,52 +77,83 @@ export default function FollowupDispatchModal({
         if (onDisparado) onDisparado();
         onClose();
       }, 600);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setIsSending(false);
-      setErro(e.message || "Erro ao disparar follow-up.");
+      const msg = e instanceof Error ? e.message : "Erro ao disparar follow-up.";
+      setErro(msg);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/50 backdrop-blur-xs p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl border border-neutral-200 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+    <div className="modal-overlay">
+      <div className="modal-content w-full max-w-lg p-6 space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+        <div
+          className="flex items-center justify-between pb-3"
+          style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        >
           <div>
-            <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
-              <Send className="h-5 w-5 text-brand-600" />
+            <h3
+              className="text-lg font-bold font-display flex items-center gap-2"
+              style={{ color: "var(--text-primary)" }}
+            >
+              <Send className="h-5 w-5" style={{ color: "var(--accent-primary)" }} />
               Disparar Follow-up Manual
             </h3>
-            <p className="text-xs text-neutral-500">Lead: <strong>{nomeLead}</strong></p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Lead: <strong>{nomeLead}</strong>
+            </p>
           </div>
-          <button onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">
+          <button
+            onClick={onClose}
+            className="rounded-md p-1"
+            style={{ color: "var(--text-muted)" }}
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Warning de Permissão (AC 3, PRD §4.2) */}
+        {/* Permission Warning */}
         {isOperadorBlocked && (
-          <div className="flex items-start gap-2.5 rounded-lg bg-rose-50 p-3 border border-rose-200 text-rose-800 text-xs">
-            <ShieldAlert className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
+          <div
+            className="flex items-start gap-2.5 rounded-lg p-3 text-xs"
+            style={{
+              background: "var(--accent-coral-muted)",
+              color: "var(--accent-coral)",
+              border: "1px solid rgba(232, 76, 94, 0.2)",
+            }}
+          >
+            <ShieldAlert className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <div>
-              <strong>Acesso Restrito:</strong> Seu perfil (operador) não possui permissão para disparar mensagens de follow-up. Esta ação é exclusiva para <u>Dono</u> e <u>Atendente</u>.
+              <strong>Acesso Restrito:</strong> Seu perfil (operador) não possui
+              permissão para disparar mensagens de follow-up.
             </div>
           </div>
         )}
 
-        {/* Warning de Janela 24h Meta (AC 2, AC 10.6) */}
+        {/* Meta Window Warning */}
         {isMetaWindowClosed && (
-          <div className="flex items-start gap-2.5 rounded-lg bg-amber-50 p-3 border border-amber-200 text-amber-900 text-xs">
-            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div
+            className="flex items-start gap-2.5 rounded-lg p-3 text-xs"
+            style={{
+              background: "var(--accent-amber-muted)",
+              color: "var(--accent-amber)",
+              border: "1px solid var(--accent-amber-border)",
+            }}
+          >
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <div>
-              <strong>Janela Meta de 24h Fechada:</strong> Apenas mensagens com template HSM pré-aprovado pela Meta podem ser enviadas para este lead.
+              <strong>Janela Meta de 24h Fechada:</strong> Apenas mensagens com
+              template HSM pré-aprovado podem ser enviadas.
             </div>
           </div>
         )}
 
-        {/* Lista de Mensagens Pré-cadastradas (AC 1) */}
+        {/* Template List */}
         <div className="space-y-3">
-          <label className="text-xs font-semibold text-neutral-700">Selecione a mensagem pré-cadastrada:</label>
+          <label className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+            Selecione a mensagem pré-cadastrada:
+          </label>
           <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
             {TEMPLATES_PADRAO.map((tpl) => {
               const isInvalid = isMetaWindowClosed && !tpl.templateMeta;
@@ -131,25 +162,41 @@ export default function FollowupDispatchModal({
                 <div
                   key={tpl.id}
                   onClick={() => !isInvalid && setSelectedTemplateId(tpl.id)}
-                  className={`flex flex-col gap-1.5 rounded-xl border p-3 cursor-pointer transition ${
-                    selectedTemplateId === tpl.id
-                      ? "border-brand-500 bg-brand-50/40 ring-1 ring-brand-500"
-                      : "border-neutral-200 hover:border-neutral-300 bg-white"
-                  } ${isInvalid ? "opacity-50 cursor-not-allowed bg-neutral-50" : ""}`}
+                  className="flex flex-col gap-1.5 rounded-xl p-3 cursor-pointer transition-all"
+                  style={{
+                    background:
+                      selectedTemplateId === tpl.id
+                        ? "var(--accent-primary-muted)"
+                        : "rgba(255, 255, 255, 0.04)",
+                    border:
+                      selectedTemplateId === tpl.id
+                        ? "1px solid rgba(16, 185, 129, 0.3)"
+                        : "1px solid rgba(255, 255, 255, 0.06)",
+                    opacity: isInvalid ? 0.5 : 1,
+                    cursor: isInvalid ? "not-allowed" : "pointer",
+                  }}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-neutral-900">{tpl.nome}</span>
+                    <span
+                      className="text-xs font-bold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {tpl.nome}
+                    </span>
                     {tpl.templateMeta ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                        <CheckCircle className="h-3 w-3" /> Template Meta
-                      </span>
+                      <Badge variant="success" icon={<CheckCircle className="h-3 w-3" />}>
+                        Template Meta
+                      </Badge>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
-                        Texto Livre
-                      </span>
+                      <Badge variant="neutral">Texto Livre</Badge>
                     )}
                   </div>
-                  <p className="text-xs text-neutral-600 line-clamp-2 italic">"{tpl.corpo}"</p>
+                  <p
+                    className="text-xs line-clamp-2 italic"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    &quot;{tpl.corpo}&quot;
+                  </p>
                 </div>
               );
             })}
@@ -157,23 +204,30 @@ export default function FollowupDispatchModal({
         </div>
 
         {erro && (
-          <div className="text-xs font-semibold text-rose-600 bg-rose-50 p-2.5 rounded-lg border border-rose-200">
+          <div
+            className="text-xs font-semibold p-2.5 rounded-lg"
+            style={{
+              background: "var(--accent-coral-muted)",
+              color: "var(--accent-coral)",
+              border: "1px solid rgba(232, 76, 94, 0.2)",
+            }}
+          >
             {erro}
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 border-t border-neutral-100 pt-3">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-neutral-300 px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 transition"
-          >
+        <div
+          className="flex items-center justify-end gap-3 pt-3"
+          style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
+        >
+          <button onClick={onClose} className="glass-btn glass-btn-ghost text-xs">
             Cancelar
           </button>
           <button
             onClick={handleDisparar}
-            disabled={isSending || isOperadorBlocked || isTemplateInvalidForMeta}
-            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 transition disabled:opacity-50"
+            disabled={isSending || isOperadorBlocked || !!isTemplateInvalidForMeta}
+            className="glass-btn glass-btn-primary text-xs"
           >
             <Send className="h-3.5 w-3.5" />
             {isSending ? "Enviando..." : "Disparar 1-Clique"}

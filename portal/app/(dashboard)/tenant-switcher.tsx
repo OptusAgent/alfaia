@@ -17,7 +17,10 @@ export function TenantSwitcher({
   // seletor "para usuários multi-tenant" — com 1 só, o seletor seria ruído).
   if (memberships.length <= 1) {
     return (
-      <span className="text-sm font-medium text-neutral-700">
+      <span
+        className="text-sm font-medium"
+        style={{ color: "var(--text-secondary)" }}
+      >
         {memberships[0]?.nome ?? "—"}
       </span>
     );
@@ -33,7 +36,7 @@ export function TenantSwitcher({
         name="tenant_id"
         defaultValue={activeTenantId}
         onChange={() => formRef.current?.requestSubmit()}
-        className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm focus:border-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900"
+        className="glass-select w-full"
       >
         {memberships.map((m) => (
           <option key={m.tenant_id} value={m.tenant_id}>

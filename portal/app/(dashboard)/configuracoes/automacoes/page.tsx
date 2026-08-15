@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Cpu, Lock, ShieldAlert, CheckCircle2, RefreshCw, Zap } from "lucide-react";
+import { Badge } from "@/app/components/ui/Badge";
+import { Cpu, Lock, ShieldAlert, CheckCircle2 } from "lucide-react";
 
 interface AutomacaoItem {
   chave: string;
   nome: string;
   descricao: string;
-  ativo: bool;
-  pode_desligar: bool;
+  ativo: boolean;
+  pode_desligar: boolean;
 }
 
 export default function AutomacoesPage() {
@@ -51,91 +52,144 @@ export default function AutomacoesPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
+      <div
+        className="flex items-center justify-between pb-4"
+        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+      >
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 flex items-center gap-2.5">
-            <Cpu className="h-7 w-7 text-brand-600" />
+          <h1
+            className="text-2xl font-bold font-display flex items-center gap-2.5"
+            style={{ color: "var(--text-primary)" }}
+          >
+            <Cpu className="h-7 w-7" style={{ color: "var(--accent-primary)" }} />
             Gestão de Automações & Toggles
           </h1>
-          <p className="text-sm text-neutral-500 mt-1">
-            Ligue ou desligue rotinas individualmente sem afetar as demais (PRD §16, S-32).
+          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+            Ligue ou desligue rotinas individualmente sem afetar as demais.
           </p>
         </div>
 
-        {/* Role Selector para teste de permissão */}
-        <div className="flex items-center gap-2 bg-neutral-100 p-1.5 rounded-lg border text-xs">
-          <span className="font-semibold text-neutral-600">Simular Papel:</span>
+        {/* Role Selector */}
+        <div
+          className="flex items-center gap-2 p-1.5 rounded-lg text-xs"
+          style={{
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.06)",
+          }}
+        >
+          <span className="font-semibold" style={{ color: "var(--text-muted)" }}>
+            Papel:
+          </span>
           <select
             value={userRole}
             onChange={(e) => setUserRole(e.target.value)}
-            className="bg-white border rounded-md px-2 py-1 font-bold text-neutral-800"
+            className="glass-select py-1 text-xs"
+            style={{ width: "auto" }}
           >
-            <option value="operador">Operador (Autorizado)</option>
-            <option value="dono">Dono (Autorizado)</option>
-            <option value="atendente">Atendente (Bloqueado)</option>
+            <option value="operador">Operador</option>
+            <option value="dono">Dono</option>
+            <option value="atendente">Atendente</option>
           </select>
         </div>
       </div>
 
-      {/* Alertas */}
+      {/* Alerts */}
       {mensagemSucesso && (
-        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center gap-3 text-emerald-800 text-xs font-semibold">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+        <div
+          className="p-4 rounded-xl flex items-center gap-3 text-xs font-semibold"
+          style={{
+            background: "var(--accent-primary-muted)",
+            color: "var(--accent-primary)",
+            border: "1px solid rgba(16, 185, 129, 0.2)",
+          }}
+        >
+          <CheckCircle2 className="h-5 w-5 shrink-0" />
           {mensagemSucesso}
         </div>
       )}
 
       {erro && (
-        <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-800 text-xs font-semibold">
-          <ShieldAlert className="h-5 w-5 text-red-600 shrink-0" />
+        <div
+          className="p-4 rounded-xl flex items-center gap-3 text-xs font-semibold"
+          style={{
+            background: "var(--accent-coral-muted)",
+            color: "var(--accent-coral)",
+            border: "1px solid rgba(232, 76, 94, 0.2)",
+          }}
+        >
+          <ShieldAlert className="h-5 w-5 shrink-0" />
           {erro}
         </div>
       )}
 
-      {/* Lista das 8 Automações (AC 1, AC 2) */}
+      {/* Automation List */}
       <div className="space-y-3">
         {automacoes.map((item) => (
           <div
             key={item.chave}
-            className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
-              item.ativo ? "bg-white border-neutral-200 shadow-2xs" : "bg-neutral-50 border-neutral-200 opacity-75"
-            }`}
+            className="glass-card p-4 flex items-center justify-between transition-all"
+            style={{
+              opacity: item.ativo ? 1 : 0.6,
+            }}
           >
             <div className="space-y-1 max-w-xl">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-neutral-900">{item.nome}</span>
-                <span className="font-mono text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className="font-bold text-sm"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {item.nome}
+                </span>
+                <span
+                  className="font-mono text-[10px] px-2 py-0.5 rounded-md"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    color: "var(--text-muted)",
+                  }}
+                >
                   {item.chave}
                 </span>
 
                 {!item.pode_desligar && (
-                  <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <Lock className="h-3 w-3 text-amber-700" /> Estrutural Obrigatória (P5/P8)
-                  </span>
+                  <Badge variant="warning" icon={<Lock className="h-3 w-3" />}>
+                    Estrutural Obrigatória
+                  </Badge>
                 )}
               </div>
-              <p className="text-xs text-neutral-500">{item.descricao}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {item.descricao}
+              </p>
             </div>
 
             {/* Toggle Switch */}
             <div className="flex items-center gap-3">
-              <span className={`text-xs font-semibold ${item.ativo ? "text-emerald-700" : "text-neutral-400"}`}>
+              <span
+                className="text-xs font-semibold"
+                style={{
+                  color: item.ativo ? "var(--accent-primary)" : "var(--text-muted)",
+                }}
+              >
                 {item.ativo ? "Ativa" : "Desativada"}
               </span>
 
               <button
                 onClick={() => handleToggle(item.chave, !item.ativo)}
                 disabled={!item.pode_desligar || userRole === "atendente"}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  item.ativo ? "bg-brand-600" : "bg-neutral-300"
-                } ${(!item.pode_desligar || userRole === "atendente") ? "cursor-not-allowed opacity-60" : ""}`}
+                className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  backgroundColor: item.ativo
+                    ? "var(--accent-primary)"
+                    : "rgba(255, 255, 255, 0.1)",
+                }}
               >
                 <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    item.ativo ? "translate-x-5" : "translate-x-0"
-                  }`}
+                  className="pointer-events-none inline-block h-5 w-5 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out"
+                  style={{
+                    backgroundColor: "var(--text-primary)",
+                    transform: item.ativo ? "translateX(1.25rem)" : "translateX(0)",
+                  }}
                 />
               </button>
             </div>

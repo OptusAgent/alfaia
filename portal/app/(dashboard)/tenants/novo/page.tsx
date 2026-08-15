@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Store, UserCheck, Radio, Server, CheckCircle2, ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
+import { Store, Radio, Server, CheckCircle2, ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
+
+interface TenantResultado {
+  sucesso: boolean;
+  tenant_id: string;
+  nome_loja: string;
+  dono_email: string;
+  canal: string;
+  wl_modo: string;
+  smoke_isolamento_passou: boolean;
+}
 
 export default function NovoTenantOnboardingPage() {
   const [passo, setPasso] = useState<number>(1);
@@ -12,7 +22,7 @@ export default function NovoTenantOnboardingPage() {
   const [wlModo, setWlModo] = useState<string>("mock");
 
   const [provisionando, setProvisionando] = useState(false);
-  const [resultado, setResultado] = useState<any | null>(null);
+  const [resultado, setResultado] = useState<TenantResultado | null>(null);
 
   const handleProvisionar = () => {
     setProvisionando(true);
@@ -40,7 +50,7 @@ export default function NovoTenantOnboardingPage() {
           Onboarding de Novo Tenant
         </h1>
         <p className="text-sm text-neutral-500 mt-1">
-          Provisione uma nova loja com isolamento de dados, canal de mensagens e integrações em 1 passo (PRD §4.1, §17.2).
+          Provisione uma nova loja com isolamento de dados, canal de mensagens e integrações em 1 passo.
         </p>
       </div>
 
@@ -72,7 +82,7 @@ export default function NovoTenantOnboardingPage() {
           <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto" />
           <h2 className="text-xl font-bold text-emerald-900">Tenant Provisionado com Sucesso!</h2>
           <p className="text-xs text-emerald-700">
-            A loja "<strong>{resultado.nome_loja}</strong>" (ID: <code className="font-mono bg-white px-2 py-0.5 rounded border">{resultado.tenant_id}</code>) foi criada transacionalmente.
+            A loja &quot;<strong>{resultado.nome_loja}</strong>&quot; (ID: <code className="font-mono bg-white px-2 py-0.5 rounded border">{resultado.tenant_id}</code>) foi criada transacionalmente.
           </p>
 
           <div className="bg-white/80 p-4 rounded-xl border border-emerald-200 max-w-md mx-auto text-left text-xs space-y-2">

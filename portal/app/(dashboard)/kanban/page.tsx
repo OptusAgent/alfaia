@@ -2,18 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Badge } from "@/app/components/ui/Badge";
 import {
   Kanban as KanbanIcon,
-  User,
   Calendar,
   DollarSign,
   Clock,
-  ChevronRight,
-  ChevronLeft,
   MessageSquare,
-  AlertCircle,
-  CheckCircle2,
-  XCircle,
 } from "lucide-react";
 
 export type StatusLead =
@@ -35,13 +30,13 @@ export interface LeadKanban {
   statusAlteradoPor: "ia" | "humano" | "sistema";
 }
 
-const COLUNAS: { id: StatusLead; titulo: string; corBorder: string; corBg: string }[] = [
-  { id: "novo", titulo: "Novo", corBorder: "border-blue-400", corBg: "bg-blue-50/50" },
-  { id: "orcamento", titulo: "Orçamento", corBorder: "border-amber-400", corBg: "bg-amber-50/50" },
-  { id: "follow_up", titulo: "Follow-up", corBorder: "border-purple-400", corBg: "bg-purple-50/50" },
-  { id: "negociando", titulo: "Negociando", corBorder: "border-indigo-400", corBg: "bg-indigo-50/50" },
-  { id: "agendado", titulo: "Agendado", corBorder: "border-teal-400", corBg: "bg-teal-50/50" },
-  { id: "descartado", titulo: "Descartado", corBorder: "border-rose-400", corBg: "bg-rose-50/50" },
+const COLUNAS: { id: StatusLead; titulo: string; cor: string }[] = [
+  { id: "novo", titulo: "Novo", cor: "#3B82F6" },
+  { id: "orcamento", titulo: "Orçamento", cor: "#F59E0B" },
+  { id: "follow_up", titulo: "Follow-up", cor: "#8B5CF6" },
+  { id: "negociando", titulo: "Negociando", cor: "#6366F1" },
+  { id: "agendado", titulo: "Agendado", cor: "#10B981" },
+  { id: "descartado", titulo: "Descartado", cor: "#F43F5E" },
 ];
 
 const MOCK_LEADS: LeadKanban[] = [
@@ -95,7 +90,6 @@ export default function KanbanPage() {
     setLeads((prev) =>
       prev.map((l) => {
         if (l.id === leadId) {
-          // Gravação explícita do autor humano (AC 2, AC 10.5)
           return {
             ...l,
             status: novoStatus,
@@ -128,26 +122,28 @@ export default function KanbanPage() {
 
   return (
     <section aria-labelledby="kanban-title" className="space-y-6">
-      {/* Header com Título e Estatísticas */}
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 id="kanban-title" className="text-xl font-bold text-neutral-900 flex items-center gap-2">
-            <KanbanIcon className="h-6 w-6 text-brand-600" />
-            Funil de Atendimento (Kanban)
+          <h1
+            id="kanban-title"
+            className="text-xl font-bold font-display flex items-center gap-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            <KanbanIcon className="h-6 w-6" style={{ color: "var(--accent-primary)" }} />
+            Funil de Atendimento
           </h1>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Acompanhe a jornada dos leads pelas etapas do funil de conversão.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm">
-            Total no Funil: <strong className="text-brand-600">{leads.length}</strong> leads
-          </span>
-        </div>
+        <Badge variant="neutral">
+          Total no Funil: <strong style={{ color: "var(--accent-primary)" }}>{leads.length}</strong> leads
+        </Badge>
       </div>
 
-      {/* Board Kanban Responsivo */}
+      {/* Board */}
       <div className="flex gap-4 overflow-x-auto pb-6 max-w-full">
         {COLUNAS.map((coluna) => {
           const leadsDaColuna = leads.filter((l) => l.status === coluna.id);
@@ -157,80 +153,111 @@ export default function KanbanPage() {
               key={coluna.id}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, coluna.id)}
-              className={`flex flex-col rounded-xl border-t-4 ${coluna.corBorder} ${coluna.corBg} border-x border-b border-neutral-200 p-3 min-h-[500px] min-w-[280px] max-w-[340px] flex-1 flex-shrink-0 shadow-sm transition`}
+              className="flex flex-col rounded-xl min-h-[500px] min-w-[280px] max-w-[340px] flex-1 flex-shrink-0 p-3 transition-all"
+              style={{
+                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+                borderTopWidth: "3px",
+                borderTopColor: coluna.cor,
+              }}
             >
-              {/* Header da Coluna */}
-              <div className="flex items-center justify-between pb-3 mb-2 border-b border-neutral-200/80">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-800">
+              {/* Column Header */}
+              <div
+                className="flex items-center justify-between pb-3 mb-2"
+                style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+              >
+                <h2
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {coluna.titulo}
                 </h2>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-neutral-600 shadow-xs border border-neutral-200">
+                <span
+                  className="rounded-full px-2 py-0.5 text-xs font-bold"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    color: "var(--text-muted)",
+                  }}
+                >
                   {leadsDaColuna.length}
                 </span>
               </div>
 
-              {/* Lista de Cards da Coluna */}
+              {/* Cards */}
               <div className="space-y-3 flex-1">
                 {leadsDaColuna.map((lead) => (
                   <div
                     key={lead.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
-                    className="group relative rounded-lg border border-neutral-200 bg-white p-3 shadow-xs hover:shadow-md transition cursor-grab active:cursor-grabbing space-y-2.5"
+                    className="group relative rounded-lg p-3 cursor-grab active:cursor-grabbing space-y-2.5 transition-all"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.04)",
+                      border: "1px solid rgba(255, 255, 255, 0.06)",
+                    }}
                   >
-                    {/* Top Card: Nome e Origem */}
+                    {/* Top */}
                     <div className="flex items-start justify-between gap-2">
-                      <div className="font-bold text-neutral-900 text-sm group-hover:text-brand-600 transition">
+                      <div
+                        className="font-bold text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         {lead.nome}
                       </div>
                       {lead.statusAlteradoPor === "humano" ? (
-                        <span className="inline-flex items-center rounded-md bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-800" title="Movimentado manualmente por atendente">
-                          Humano
-                        </span>
+                        <Badge variant="purple">Humano</Badge>
                       ) : (
-                        <span className="inline-flex items-center rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800" title="Movimentado por automação IA">
-                          IA
-                        </span>
+                        <Badge variant="success">IA</Badge>
                       )}
                     </div>
 
-                    {/* Metadados do Lead (AC 4) */}
-                    <div className="text-xs text-neutral-600 space-y-1">
+                    {/* Metadata */}
+                    <div className="text-xs space-y-1" style={{ color: "var(--text-secondary)" }}>
                       {lead.evento && (
-                        <div className="flex items-center gap-1.5 text-neutral-700">
-                          <Calendar className="h-3.5 w-3.5 text-neutral-400 flex-shrink-0" />
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "var(--text-muted)" }} />
                           <span className="truncate">{lead.evento}</span>
                         </div>
                       )}
 
                       {lead.valorEstimado && (
-                        <div className="flex items-center gap-1.5 font-semibold text-emerald-700">
-                          <DollarSign className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                        <div className="flex items-center gap-1.5 font-semibold" style={{ color: "var(--accent-primary)" }}>
+                          <DollarSign className="h-3.5 w-3.5 flex-shrink-0" />
                           <span>R$ {lead.valorEstimado.toFixed(2)}</span>
                         </div>
                       )}
 
-                      <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 pt-1 border-t border-neutral-100">
+                      <div
+                        className="flex items-center gap-1.5 text-[11px] pt-1"
+                        style={{
+                          color: "var(--text-muted)",
+                          borderTop: "1px solid rgba(255, 255, 255, 0.04)",
+                        }}
+                      >
                         <Clock className="h-3 w-3 flex-shrink-0" />
                         <span>{lead.tempoUltimoContato}</span>
                       </div>
                     </div>
 
-                    {/* Controles de Acessibilidade Keyboard WCAG 2.1 AA (Task 5) */}
-                    <div className="pt-2 flex items-center justify-between border-t border-neutral-100 text-xs">
+                    {/* Actions */}
+                    <div
+                      className="pt-2 flex items-center justify-between text-xs"
+                      style={{ borderTop: "1px solid rgba(255, 255, 255, 0.04)" }}
+                    >
                       <Link
                         href={`/conversas?lead_id=${lead.id}`}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:underline"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium hover:underline"
+                        style={{ color: "var(--accent-primary)" }}
                       >
                         <MessageSquare className="h-3 w-3" /> Abrir Chat
                       </Link>
 
-                      {/* Dropdown de Acessibilidade por Teclado */}
                       <select
                         aria-label={`Mover lead ${lead.nome}`}
                         value={lead.status}
                         onChange={(e) => moverStatus(lead.id, e.target.value as StatusLead)}
-                        className="text-[10px] rounded border border-neutral-200 bg-neutral-50 px-1 py-0.5 text-neutral-700 focus:outline-none"
+                        className="glass-select text-[10px] py-0.5 px-1"
+                        style={{ width: "auto" }}
                       >
                         {COLUNAS.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -243,7 +270,13 @@ export default function KanbanPage() {
                 ))}
 
                 {leadsDaColuna.length === 0 && (
-                  <div className="h-24 flex items-center justify-center rounded-lg border border-dashed border-neutral-300/70 text-xs text-neutral-400 italic">
+                  <div
+                    className="h-24 flex items-center justify-center rounded-lg text-xs italic"
+                    style={{
+                      border: "1px dashed rgba(255, 255, 255, 0.1)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
                     Nenhum lead nesta etapa
                   </div>
                 )}

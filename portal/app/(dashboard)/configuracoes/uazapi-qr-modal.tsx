@@ -82,42 +82,66 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-[#E7DFD2]">
-        {/* Cabeçalho do Modal */}
-        <div className="flex items-center justify-between border-b border-[#E7DFD2] pb-4">
+    <div className="modal-overlay">
+      <div className="modal-content w-full max-w-lg p-6">
+        {/* Header */}
+        <div
+          className="flex items-center justify-between pb-4"
+          style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0E4A7B] text-white">
-              <QrCode className="h-5 w-5" />
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl"
+              style={{ background: "var(--accent-primary-muted)" }}
+            >
+              <QrCode className="h-5 w-5" style={{ color: "var(--accent-primary)" }} />
             </div>
             <div>
-              <h2 className="font-serif text-xl font-bold text-[#072F53]">Conectar Instância UAZAPI</h2>
-              <p className="text-xs text-[#6B5E52]">WhatsApp Web (Canal Não Oficial)</p>
+              <h2
+                className="font-display text-xl font-bold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Conectar Instância UAZAPI
+              </h2>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                WhatsApp Web (Canal Não Oficial)
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 transition-colors"
+            className="rounded-lg p-1.5 transition-colors"
+            style={{ color: "var(--text-muted)" }}
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Mensagem de Erro */}
+        {/* Error */}
         {error && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+          <div
+            className="mt-4 flex items-center gap-2 rounded-xl p-3 text-sm"
+            style={{
+              background: "var(--accent-coral-muted)",
+              color: "var(--accent-coral)",
+              border: "1px solid rgba(232, 76, 94, 0.2)",
+            }}
+          >
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Conteúdo por Etapa */}
+        {/* Content by Step */}
         <div className="py-6">
           {step === "form" && (
             <form onSubmit={handleGerarQrCode} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#072F53] mb-1.5">
-                  Nome da Instância <span className="text-red-500">*</span>
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Nome da Instância <span style={{ color: "var(--accent-coral)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -125,12 +149,15 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
                   placeholder="ex: loja_centro_whatsapp"
                   value={nomeInstancia}
                   onChange={(e) => setNomeInstancia(e.target.value)}
-                  className="w-full rounded-xl border border-[#E7DFD2] bg-white px-4 py-2.5 text-sm text-[#1F1B17] placeholder:text-neutral-400 focus:border-[#A67C2E] focus:outline-none focus:ring-1 focus:ring-[#A67C2E]"
+                  className="glass-input"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#072F53] mb-1.5">
+                <label
+                  className="block text-xs font-semibold uppercase tracking-wider mb-1.5"
+                  style={{ color: "var(--text-muted)" }}
+                >
                   Número de Telefone (Opcional)
                 </label>
                 <input
@@ -138,23 +165,28 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
                   placeholder="ex: 5585988124477"
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value)}
-                  className="w-full rounded-xl border border-[#E7DFD2] bg-white px-4 py-2.5 text-sm text-[#1F1B17] placeholder:text-neutral-400 focus:border-[#A67C2E] focus:outline-none focus:ring-1 focus:ring-[#A67C2E]"
+                  className="glass-input"
                 />
-                <p className="mt-1 text-xs text-[#6B5E52]">Número do WhatsApp que fará o pareamento.</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                  Número do WhatsApp que fará o pareamento.
+                </p>
               </div>
 
-              <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-[#E7DFD2]">
+              <div
+                className="mt-6 flex justify-end gap-3 pt-4"
+                style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
+              >
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-xl border border-[#E7DFD2] px-4 py-2 text-sm font-medium text-[#1F1B17] hover:bg-neutral-50"
+                  className="glass-btn glass-btn-ghost text-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex items-center gap-2 rounded-xl bg-[#0E4A7B] px-5 py-2 text-sm font-medium text-white shadow hover:bg-[#072F53] disabled:opacity-50 transition-all"
+                  className="glass-btn glass-btn-primary text-sm"
                 >
                   {loading ? (
                     <>
@@ -174,32 +206,51 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
 
           {step === "qrcode" && (
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="rounded-2xl border-2 border-dashed border-[#A67C2E] p-4 bg-[#FAF7F2]">
+              <div
+                className="rounded-2xl border-2 border-dashed p-4"
+                style={{
+                  borderColor: "rgba(16, 185, 129, 0.3)",
+                  background: "rgba(16, 185, 129, 0.04)",
+                }}
+              >
                 {qrCodeData ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={qrCodeData}
                     alt="QR Code de Pareamento WhatsApp"
-                    className="h-56 w-56 object-contain rounded-lg shadow-sm"
+                    className="h-56 w-56 object-contain rounded-lg"
                   />
                 ) : (
                   <div className="flex h-56 w-56 items-center justify-center">
-                    <RefreshCw className="h-8 w-8 animate-spin text-[#0E4A7B]" />
+                    <RefreshCw
+                      className="h-8 w-8 animate-spin"
+                      style={{ color: "var(--accent-primary)" }}
+                    />
                   </div>
                 )}
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center justify-center gap-2 text-sm font-semibold text-[#072F53]">
-                  <Smartphone className="h-4 w-4 text-[#A67C2E]" />
+                <div
+                  className="flex items-center justify-center gap-2 text-sm font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  <Smartphone className="h-4 w-4" style={{ color: "var(--accent-primary)" }} />
                   <span>Abra o WhatsApp no seu celular</span>
                 </div>
-                <p className="text-xs text-[#6B5E52] max-w-xs">
-                  Vá em <strong>Dispositivos Conectados ➔ Conectar um dispositivo</strong> e aponte a câmera para a imagem acima.
+                <p className="text-xs max-w-xs" style={{ color: "var(--text-secondary)" }}>
+                  Vá em <strong>Dispositivos Conectados → Conectar um dispositivo</strong> e
+                  aponte a câmera para a imagem acima.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-[#0E4A7B] bg-[#F3F6F9] px-3 py-1.5 rounded-full font-mono">
+              <div
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full font-mono"
+                style={{
+                  background: "var(--accent-primary-muted)",
+                  color: "var(--accent-primary)",
+                }}
+              >
                 <RefreshCw className="h-3 w-3 animate-spin" />
                 <span>Aguardando leitura do QR Code...</span>
               </div>
@@ -207,7 +258,8 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
               <button
                 type="button"
                 onClick={() => setStep("success")}
-                className="mt-2 text-xs text-[#A67C2E] underline hover:text-[#072F53]"
+                className="mt-2 text-xs underline"
+                style={{ color: "var(--text-muted)" }}
               >
                 [Dev Test: Simular Pareamento Concluído]
               </button>
@@ -216,27 +268,56 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
 
           {step === "success" && (
             <div className="flex flex-col items-center text-center space-y-4 py-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                <CheckCircle2 className="h-10 w-10" />
+              <div
+                className="flex h-16 w-16 items-center justify-center rounded-full"
+                style={{ background: "var(--accent-primary-muted)" }}
+              >
+                <CheckCircle2
+                  className="h-10 w-10"
+                  style={{ color: "var(--accent-primary)" }}
+                />
               </div>
 
               <div className="space-y-1">
-                <h3 className="font-serif text-2xl font-bold text-[#072F53]">Instância Conectada!</h3>
-                <p className="text-sm text-[#6B5E52]">
-                  O WhatsApp da instância <strong>{nomeInstancia}</strong> foi pareado e autorizado com sucesso na UAZAPI.
+                <h3
+                  className="font-display text-2xl font-bold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Instância Conectada!
+                </h3>
+                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  O WhatsApp da instância <strong>{nomeInstancia}</strong> foi
+                  pareado e autorizado com sucesso na UAZAPI.
                 </p>
               </div>
 
-              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 text-left w-full space-y-1">
+              <div
+                className="rounded-xl p-3 text-xs text-left w-full space-y-1"
+                style={{
+                  background: "var(--accent-primary-muted)",
+                  color: "var(--accent-primary)",
+                  border: "1px solid rgba(16, 185, 129, 0.2)",
+                }}
+              >
                 <p>✓ Webhook configurado automaticamente</p>
-                <p>✓ Canal registrado na tabela <code className="font-mono bg-emerald-100 px-1 rounded">canais</code></p>
-                <p>✓ Status atual: <strong className="uppercase">Conectado</strong></p>
+                <p>
+                  ✓ Canal registrado na tabela{" "}
+                  <code
+                    className="font-mono px-1 rounded"
+                    style={{ background: "rgba(16, 185, 129, 0.15)" }}
+                  >
+                    canais
+                  </code>
+                </p>
+                <p>
+                  ✓ Status atual: <strong className="uppercase">Conectado</strong>
+                </p>
               </div>
 
               <button
                 type="button"
                 onClick={handleFinalizar}
-                className="w-full rounded-xl bg-[#0E4A7B] py-2.5 text-sm font-medium text-white shadow hover:bg-[#072F53] transition-all"
+                className="glass-btn glass-btn-primary w-full py-2.5 text-sm"
               >
                 Concluir e Voltar
               </button>

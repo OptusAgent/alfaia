@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Badge } from '@/app/components/ui/Badge';
+import { Send } from 'lucide-react';
 
 interface Conversa {
   id: string;
@@ -57,113 +59,181 @@ export default function ConversasPage() {
 
   const renderBadge = (estado: Conversa['estado']) => {
     if (estado === 'ia') {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-          IA Atendendo
-        </span>
-      );
+      return <Badge variant="success">IA Atendendo</Badge>;
     }
     if (estado === 'transbordo') {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 animate-pulse">
-          Transbordo Solicitado
-        </span>
-      );
+      return <Badge variant="warning" pulse>Transbordo Solicitado</Badge>;
     }
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-navy-100 text-[#072F53] font-semibold border border-[#072F53]/20">
-        Atendimento Humano
-      </span>
-    );
+    return <Badge variant="purple">Atendimento Humano</Badge>;
   };
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] bg-[#FAF7F2] text-slate-800 font-sans">
-      {/* Sidebar Lista de Conversas Realtime */}
-      <div className="w-1/3 border-r border-[#E7DFD2] bg-white flex flex-col">
-        <div className="p-4 border-b border-[#E7DFD2] bg-[#FAF7F2]">
-          <h1 className="text-xl font-serif font-bold text-[#072F53]">Painel Realtime de Conversas</h1>
-          <p className="text-xs text-slate-5-0 mt-1">Latência de sincronização &le; 2s (NFR9)</p>
+    <div
+      className="flex h-[calc(100vh-6rem)] rounded-xl overflow-hidden"
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid rgba(255, 255, 255, 0.06)",
+      }}
+    >
+      {/* Sidebar Lista de Conversas */}
+      <div
+        className="w-1/3 flex flex-col"
+        style={{ borderRight: "1px solid rgba(255, 255, 255, 0.06)" }}
+      >
+        <div
+          className="p-4"
+          style={{
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            background: "rgba(255, 255, 255, 0.02)",
+          }}
+        >
+          <h1
+            className="text-lg font-display font-bold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Conversas em Tempo Real
+          </h1>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+            Latência de sincronização ≤ 2s
+          </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-[#E7DFD2]">
+        <div className="flex-1 overflow-y-auto">
           {conversas.map((c) => (
             <div
               key={c.id}
               onClick={() => setSelecionadaId(c.id)}
-              className={`p-4 cursor-pointer transition-colors ${
-                selecionadaId === c.id ? 'bg-[#FAF7F2]' : 'hover:bg-slate-50'
-              }`}
+              className="p-4 cursor-pointer transition-all"
+              style={{
+                borderBottom: "1px solid rgba(255, 255, 255, 0.03)",
+                background:
+                  selecionadaId === c.id
+                    ? "rgba(16, 185, 129, 0.06)"
+                    : "transparent",
+                borderLeft:
+                  selecionadaId === c.id
+                    ? "3px solid var(--accent-primary)"
+                    : "3px solid transparent",
+              }}
             >
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-slate-900">{c.contato_nome}</h3>
-                <span className="text-xs text-slate-400">{c.atualizado_em}</span>
+                <h3
+                  className="font-semibold text-sm"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {c.contato_nome}
+                </h3>
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {c.atualizado_em}
+                </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">{c.telefone}</p>
-              <div className="mt-2 flex items-center justify-between">
-                {renderBadge(c.estado)}
-              </div>
-              <p className="text-xs text-slate-600 mt-2 line-clamp-1 italic">
-                "{c.ultima_mensagem}"
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {c.telefone}
+              </p>
+              <div className="mt-2">{renderBadge(c.estado)}</div>
+              <p
+                className="text-xs mt-2 line-clamp-1 italic"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                &quot;{c.ultima_mensagem}&quot;
               </p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Detalhe da Conversa Selecionada */}
-      <div className="flex-1 flex flex-col bg-[#FAF7F2]">
+      {/* Detalhe da Conversa */}
+      <div className="flex-1 flex flex-col" style={{ background: "var(--bg-primary)" }}>
         {conversaSelecionada ? (
           <>
-            {/* Header da Conversa */}
-            <div className="p-4 border-b border-[#E7DFD2] bg-white flex items-center justify-between shadow-sm">
+            {/* Header */}
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{
+                borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+                background: "rgba(255, 255, 255, 0.02)",
+              }}
+            >
               <div>
                 <div className="flex items-center gap-3">
-                  <h2 className="text-lg font-semibold text-[#072F53]">{conversaSelecionada.contato_nome}</h2>
+                  <h2
+                    className="text-base font-semibold font-display"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {conversaSelecionada.contato_nome}
+                  </h2>
                   {renderBadge(conversaSelecionada.estado)}
                 </div>
-                <p className="text-xs text-slate-500">{conversaSelecionada.telefone}</p>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {conversaSelecionada.telefone}
+                </p>
               </div>
 
               <div className="flex items-center gap-3">
                 {conversaSelecionada.estado === 'humano' ? (
                   <button
                     onClick={() => devolverParaIA(conversaSelecionada.id)}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all"
+                    className="glass-btn glass-btn-primary text-xs"
                   >
-                    Devolver para Atendimento IA
+                    Devolver para IA
                   </button>
                 ) : (
                   <button
                     onClick={() => assumirConversa(conversaSelecionada.id)}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-[#072F53] hover:bg-[#0E4A7B] rounded-lg shadow-sm transition-all"
+                    className="glass-btn glass-btn-ghost text-xs"
+                    style={{
+                      borderColor: "rgba(16, 185, 129, 0.3)",
+                      color: "var(--accent-primary)",
+                    }}
                   >
-                    Assumir Conversa (Pausar IA)
+                    Assumir Conversa
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Histórico de Mensagens */}
+            {/* Mensagens */}
             <div className="flex-1 p-6 overflow-y-auto space-y-4">
               <div className="flex justify-start">
-                <div className="max-w-md bg-white p-3 rounded-2xl rounded-tl-none border border-[#E7DFD2] shadow-sm">
-                  <p className="text-xs text-slate-500 mb-1 font-semibold">Cliente</p>
-                  <p className="text-sm">{conversaSelecionada.ultima_mensagem}</p>
+                <div
+                  className="max-w-md p-3 rounded-2xl rounded-tl-none"
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                  }}
+                >
+                  <p className="text-xs mb-1 font-semibold" style={{ color: "var(--accent-primary)" }}>
+                    Cliente
+                  </p>
+                  <p className="text-sm" style={{ color: "var(--text-primary)" }}>
+                    {conversaSelecionada.ultima_mensagem}
+                  </p>
                 </div>
               </div>
 
               {conversaSelecionada.estado === 'humano' && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
-                  <p className="text-xs text-amber-800 font-medium">
-                    ⚠️ Atendimento Humano Ativo: O motor de IA está pausado e não responderá a novas mensagens.
+                <div
+                  className="p-3 rounded-xl text-center"
+                  style={{
+                    background: "var(--accent-amber-muted)",
+                    border: "1px solid var(--accent-amber-border)",
+                  }}
+                >
+                  <p className="text-xs font-medium" style={{ color: "var(--accent-amber)" }}>
+                    ⚠️ Atendimento Humano Ativo: O motor de IA está pausado.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Input de Envio Humano */}
-            <div className="p-4 border-t border-[#E7DFD2] bg-white flex items-center gap-3">
+            {/* Input */}
+            <div
+              className="p-4 flex items-center gap-3"
+              style={{
+                borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                background: "rgba(255, 255, 255, 0.02)",
+              }}
+            >
               <input
                 type="text"
                 placeholder={
@@ -172,18 +242,21 @@ export default function ConversasPage() {
                     : 'Assuma a conversa para responder...'
                 }
                 disabled={conversaSelecionada.estado !== 'humano'}
-                className="flex-1 px-4 py-2 border border-[#E7DFD2] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#072F53] disabled:bg-slate-100 disabled:cursor-not-allowed"
+                className="glass-input flex-1"
               />
               <button
                 disabled={conversaSelecionada.estado !== 'humano'}
-                className="px-5 py-2 text-sm font-medium text-white bg-[#072F53] rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="glass-btn glass-btn-primary px-4"
               >
-                Enviar
+                <Send className="h-4 w-4" />
               </button>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400">
+          <div
+            className="flex-1 flex items-center justify-center"
+            style={{ color: "var(--text-muted)" }}
+          >
             Selecione uma conversa para visualizar
           </div>
         )}
