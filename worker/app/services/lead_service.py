@@ -14,6 +14,7 @@ class ContatoModel(BaseModel):
     telefone: str
     nome: str | None = None
     opt_out: bool = False
+    opt_out_em: datetime | None = None
     tags: list[str] = Field(default_factory=list)
     total_leads: int = 0
     primeiro_contato_em: datetime = Field(default_factory=datetime.now)
