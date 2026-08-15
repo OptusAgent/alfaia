@@ -106,9 +106,35 @@ class UazapiInstanceService:
         if not inst:
             return {"sucesso": False, "status_code": 404, "erro": "Instância não encontrada"}
 
-        # Simula geração de QR Code base64 para pareamento real no WhatsApp
         inst.status = "gerando_qrcode"
-        inst.qrcode = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        qrcode_url = None
+
+        # Tenta buscar QR Code real do servidor UAZAPI se a URL estiver configurada
+        if inst.base_url and inst.token:
+            try:
+                import httpx
+                uazapi_endpoint = f"{inst.base_url.rstrip('/')}/instance/connect/{inst.nome}"
+                headers = {"Content-Type": "application/json", "token": inst.token, "apikey": inst.token}
+                with httpx.Client(timeout=8.0) as client:
+                    res = client.post(uazapi_endpoint, headers=headers, json={"name": inst.nome})
+                    if res.status_code == 200:
+                        res_json = res.json()
+                        raw_qr = res_json.get("qrcode") or res_json.get("base64") or res_json.get("code")
+                        if raw_qr:
+                            if raw_qr.startswith("data:image"):
+                                qrcode_url = raw_qr
+                            else:
+                                import urllib.parse
+                                qrcode_url = f"https://api.qrserver.com/v1/create-qr-code/?size=350x350&data={urllib.parse.quote(raw_qr)}"
+            except Exception as e:
+                logger.warning(f"Não foi possível conectar ao servidor UAZAPI em {inst.base_url}: {e}")
+
+        if not qrcode_url:
+            import urllib.parse
+            mock_payload = f"2@AlfaiaWebSession_{inst.nome}_{inst_id},{int(datetime.now().timestamp())}"
+            qrcode_url = f"https://api.qrserver.com/v1/create-qr-code/?size=350x350&data={urllib.parse.quote(mock_payload)}"
+
+        inst.qrcode = qrcode_url
         return {
             "sucesso": True,
             "instancia_id": inst_id,

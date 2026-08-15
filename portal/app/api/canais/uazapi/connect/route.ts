@@ -12,43 +12,55 @@ export async function POST(req: Request) {
 
     mockStatusMap[nome] = "conectando";
 
-    const uazapiBaseUrl = process.env.UAZAPI_BASE_URL;
+    const uazapiBaseUrl = process.env.UAZAPI_BASE_URL || process.env.NEXT_PUBLIC_UAZAPI_BASE_URL;
     const uazapiAdminToken = process.env.UAZAPI_ADMIN_TOKEN;
 
     let qrcodeUrl = "";
+    let isLiveFromUazapi = false;
+    let errorMessage = "";
 
-    // 1. Integração com servidor real UAZAPI (se credenciais estiverem no .env)
+    // 1. Tenta integração com o servidor UAZAPI real se a URL estiver configurada
     if (uazapiBaseUrl && uazapiAdminToken) {
       try {
-        const uazapiRes = await fetch(
-          `${uazapiBaseUrl.replace(/\/$/, "")}/instance/connect/${encodeURIComponent(nome)}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              token: uazapiAdminToken,
-              apikey: uazapiAdminToken,
-            },
-            body: JSON.stringify({ name: nome, phone: telefone }),
-          }
-        );
+        const cleanBaseUrl = uazapiBaseUrl.replace(/\/$/, "");
+        const uazapiRes = await fetch(`${cleanBaseUrl}/instance/connect/${encodeURIComponent(nome)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            token: uazapiAdminToken,
+            apikey: uazapiAdminToken,
+          },
+          body: JSON.stringify({ name: nome, phone: telefone }),
+        });
 
         if (uazapiRes.ok) {
           const uazapiData = await uazapiRes.json();
-          if (uazapiData.qrcode || uazapiData.base64) {
-            qrcodeUrl = uazapiData.qrcode || uazapiData.base64;
+          const rawQr = uazapiData.qrcode || uazapiData.base64 || uazapiData.code;
+
+          if (rawQr) {
+            isLiveFromUazapi = true;
+            if (rawQr.startsWith("data:image")) {
+              qrcodeUrl = rawQr;
+            } else {
+              // Se o UAZAPI retornar a string de pareamento (ex: 2@...), converte para QR Code escaneável
+              qrcodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(rawQr)}`;
+            }
           }
+        } else {
+          errorMessage = `UAZAPI HTTP ${uazapiRes.status}`;
         }
-      } catch {
-        // Fallback se o endpoint UAZAPI estiver indisponível no momento
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Falha na conexão UAZAPI";
+        errorMessage = `Servidor UAZAPI inacessível: ${msg}`;
       }
     }
 
-    // 2. Fallback / Dev Mode: Gera um QR Code REAL e escaneável via QR Service
+    // 2. Se não houver servidor UAZAPI ativo configurado
     if (!qrcodeUrl) {
       const cleanPhone = (telefone || "5585988112233").replace(/\D/g, "");
-      const pairingPayload = `https://wa.me/${cleanPhone}?text=Pareamento+Alfaia+Instancia+${encodeURIComponent(nome)}`;
-      qrcodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pairingPayload)}`;
+      // Mock pairing code no formato 2@... para exibição
+      const mockPairingString = `2@AlfaiaWebSession_${nome}_${cleanPhone},${Date.now()}`;
+      qrcodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(mockPairingString)}`;
     }
 
     return NextResponse.json({
@@ -57,6 +69,8 @@ export async function POST(req: Request) {
       telefone: telefone || null,
       status: "qrcode",
       qrcode: qrcodeUrl,
+      isLive: isLiveFromUazapi,
+      error: errorMessage || null,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erro desconhecido";
