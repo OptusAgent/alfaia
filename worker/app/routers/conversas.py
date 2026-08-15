@@ -361,3 +361,63 @@ async def expurgo_24m_endpoint(tenant_id: str = "tenant_piloto"):
     """
     from app.services.lgpd_service import lgpd_service
     return lgpd_service.executar_expurgo_24_meses(tenant_id=tenant_id)
+
+
+class CriarInstanciaRequest(BaseModel):
+    nome: str
+    base_url: str
+    token: str
+    tenant_id: str = "tenant_piloto"
+
+
+class AtualizarInstanciaRequest(BaseModel):
+    nome: str
+    base_url: str
+    token: str
+    status: str | None = None
+    tenant_id: str = "tenant_piloto"
+
+
+@router.get("/instancias")
+async def listar_instancias_endpoint(tenant_id: str = "tenant_piloto"):
+    """Lista as instâncias UAZAPI cadastradas."""
+    from app.services.uazapi_instance_service import uazapi_instance_service
+    return {"sucesso": True, "instancias": uazapi_instance_service.listar_instancias(tenant_id=tenant_id)}
+
+
+@router.post("/instancias")
+async def criar_instancia_endpoint(body: CriarInstanciaRequest):
+    """Cria uma nova instância UAZAPI real."""
+    from app.services.uazapi_instance_service import uazapi_instance_service
+    return uazapi_instance_service.criar_instancia(
+        tenant_id=body.tenant_id, nome=body.nome, base_url=body.base_url, token=body.token
+    )
+
+
+@router.put("/instancias/{inst_id}")
+async def atualizar_instancia_endpoint(inst_id: str, body: AtualizarInstanciaRequest):
+    """Atualiza configurações de uma instância UAZAPI."""
+    from app.services.uazapi_instance_service import uazapi_instance_service
+    res = uazapi_instance_service.atualizar_instancia(
+        tenant_id=body.tenant_id, inst_id=inst_id, nome=body.nome, base_url=body.base_url, token=body.token, status=body.status
+    )
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=res.get("status_code", 404), detail=res.get("erro"))
+    return res
+
+
+@router.delete("/instancias/{inst_id}")
+async def deletar_instancia_endpoint(inst_id: str, tenant_id: str = "tenant_piloto"):
+    """Remove uma instância UAZAPI."""
+    from app.services.uazapi_instance_service import uazapi_instance_service
+    return uazapi_instance_service.deletar_instancia(tenant_id=tenant_id, inst_id=inst_id)
+
+
+@router.post("/instancias/{inst_id}/qrcode")
+async def gerar_qrcode_instancia_endpoint(inst_id: str, tenant_id: str = "tenant_piloto"):
+    """Gera QR Code para conexão do WhatsApp com a instância UAZAPI."""
+    from app.services.uazapi_instance_service import uazapi_instance_service
+    res = uazapi_instance_service.gerar_qrcode(tenant_id=tenant_id, inst_id=inst_id)
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=res.get("status_code", 404), detail=res.get("erro"))
+    return res

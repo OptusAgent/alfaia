@@ -14,7 +14,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Conversas", href: "/conversas", anyOf: [{ recurso: "atendimento", acao: "read" }] },
   { label: "Agenda", href: "/agenda", anyOf: [{ recurso: "agenda", acao: "read" }] },
   { label: "Contatos", href: "/contatos", anyOf: [{ recurso: "contato", acao: "read" }] },
-  { label: "Campanhas", href: "/campanhas", anyOf: [{ recurso: "campanha", acao: "read" }] },
   {
     label: "Configurações",
     href: "/configuracoes",

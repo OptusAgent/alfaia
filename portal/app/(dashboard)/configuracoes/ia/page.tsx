@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Lock, Save, ShieldAlert, Sparkles, Sliders, CheckCircle2, Clock } from "lucide-react";
+import { Bot, Lock, Save, ShieldAlert, Sparkles, Sliders, CheckCircle2, Key, Cpu } from "lucide-react";
 
 export default function IaConfigPage() {
-  const [userRole, setUserRole] = useState<string>("operador"); // Simulação de papel
+  const [userRole, setUserRole] = useState<string>("operador");
+  const [provedor, setProvedor] = useState<string>("openrouter");
+  const [openrouterKey, setOpenrouterKey] = useState<string>("");
+  const [openaiKey, setOpenaiKey] = useState<string>("");
   const [personaNome, setPersonaNome] = useState<string>("Atendente da Alfaia");
   const [promptSistema, setPromptSistema] = useState<string>(
     "Você é a atendente virtual da Alfaia Alta Costura. Seu tom é elegante, acolhedor e atencioso. Auxilie a cliente com dúvidas sobre vestidos sob medida, provas e locações."
   );
-  const [modelo, setModelo] = useState<string>("claude-sonnet-4-6");
+  const [modelo, setModelo] = useState<string>("deepseek/deepseek-r1-distill-llama-70b");
   const [temperatura, setTemperatura] = useState<number>(0.3);
   const [janelaRetomadaDias, setJanelaRetomadaDias] = useState<number>(7);
   const [janelaSilencioHoras, setJanelaSilencioHoras] = useState<number>(24);
@@ -23,7 +26,6 @@ export default function IaConfigPage() {
     setErro(null);
     setMensagemSucesso(false);
 
-    // Validação de Guard no Frontend (AC 2)
     if (userRole !== "operador") {
       setErro("Permissão negada. Apenas o perfil 'operador' pode salvar alterações no prompt e persona.");
       return;
@@ -51,7 +53,7 @@ export default function IaConfigPage() {
             Configuração da IA & Persona
           </h1>
           <p className="text-sm text-neutral-500 mt-1">
-            Personalize a identidade da IA e os parâmetros operacionais (PRD §17.9, §19.1).
+            Personalize o provedor de IA, chaves de API, identidade da persona e parâmetros de atendimento.
           </p>
         </div>
 
@@ -85,34 +87,93 @@ export default function IaConfigPage() {
         </div>
       )}
 
+      {/* Bloco 0: Provedor & Credenciais de IA */}
+      <div className="bg-white p-6 rounded-xl border border-neutral-200 shadow-2xs space-y-4">
+        <h2 className="text-sm font-bold text-neutral-900 flex items-center gap-2 border-b pb-2">
+          <Cpu className="h-4 w-4 text-brand-600" /> Provedor de LLM & Credenciais de Teste
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-semibold text-neutral-700">Provedor Ativo:</label>
+            <select
+              value={provedor}
+              onChange={(e) => setProvedor(e.target.value)}
+              className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300 bg-white font-semibold"
+            >
+              <option value="openrouter">OpenRouter (Testes Atuais / Multi-modelo)</option>
+              <option value="openai">OpenAI (Oficial / Estrutura Futura)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-neutral-700">Modelo Selecionado:</label>
+            <select
+              value={modelo}
+              onChange={(e) => setModelo(e.target.value)}
+              className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300 bg-white font-mono"
+            >
+              {provedor === "openrouter" ? (
+                <>
+                  <option value="deepseek/deepseek-r1-distill-llama-70b">DeepSeek R1 Distill Llama 70B (OpenRouter)</option>
+                  <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B Instruct (OpenRouter)</option>
+                  <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (OpenRouter)</option>
+                </>
+              ) : (
+                <>
+                  <option value="gpt-4o-mini">GPT-4o-mini (OpenAI Oficial)</option>
+                  <option value="gpt-4o">GPT-4o (OpenAI Oficial)</option>
+                </>
+              )}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <div>
+            <label className="text-xs font-semibold text-neutral-700 flex items-center gap-1">
+              <Key className="h-3.5 w-3.5 text-neutral-500" /> Chave OpenRouter (Ativa nos testes):
+            </label>
+            <input
+              type="password"
+              placeholder="sk-or-v1-..."
+              value={openrouterKey}
+              onChange={(e) => setOpenrouterKey(e.target.value)}
+              className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300 font-mono"
+            />
+            <span className="text-[10px] text-neutral-400">Extraia em openrouter.ai {"->"} Keys</span>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-neutral-700 flex items-center gap-1">
+              <Key className="h-3.5 w-3.5 text-neutral-500" /> Chave OpenAI (Estrutura pronta):
+            </label>
+            <input
+              type="password"
+              placeholder="sk-proj-..."
+              value={openaiKey}
+              onChange={(e) => setOpenaiKey(e.target.value)}
+              className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300 font-mono"
+            />
+            <span className="text-[10px] text-neutral-400">Extraia em platform.openai.com {"->"} API Keys</span>
+          </div>
+        </div>
+      </div>
+
       {/* Bloco 1: Identidade & Persona (EDITÁVEL) */}
       <div className="bg-white p-6 rounded-xl border border-neutral-200 shadow-2xs space-y-4">
         <h2 className="text-sm font-bold text-neutral-900 flex items-center gap-2 border-b pb-2">
           <Sparkles className="h-4 w-4 text-brand-600" /> Bloco 1: Identidade & Persona da IA (Editável por Operador)
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs font-semibold text-neutral-700">Nome da Persona:</label>
-            <input
-              type="text"
-              value={personaNome}
-              onChange={(e) => setPersonaNome(e.target.value)}
-              className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-hidden focus:border-brand-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-neutral-700">Modelo LLM:</label>
-            <select
-              value={modelo}
-              onChange={(e) => setModelo(e.target.value)}
-              className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300 bg-white"
-            >
-              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Recomendado)</option>
-              <option value="gpt-4o">GPT-4o</option>
-            </select>
-          </div>
+        <div>
+          <label className="text-xs font-semibold text-neutral-700">Nome da Persona:</label>
+          <input
+            type="text"
+            value={personaNome}
+            onChange={(e) => setPersonaNome(e.target.value)}
+            className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300 focus:outline-hidden focus:border-brand-500"
+          />
         </div>
 
         <div>
@@ -137,7 +198,7 @@ export default function IaConfigPage() {
           </span>
         </div>
         <p className="text-xs text-amber-800 leading-relaxed">
-          Estas 4 regras são gravadas em código e injetadas automaticamente no prompt final de todos os atendimentos para proteger o tenant (AC 19.1):
+          Estas 4 regras são gravadas em código e injetadas automaticamente no prompt final de todos os atendimentos para proteger o tenant:
         </p>
         <ul className="text-xs text-amber-900 space-y-1.5 list-disc list-inside font-medium bg-white/70 p-3 rounded-lg border border-amber-200/50">
           <li><strong>Regra R1 (Fidelidade ao Catálogo)</strong>: Nunca inventar preços, modelos ou estoques fora da base.</li>
@@ -147,7 +208,7 @@ export default function IaConfigPage() {
         </ul>
       </div>
 
-      {/* Bloco 3: Parâmetros de Atendimento (AC 2) */}
+      {/* Bloco 3: Parâmetros de Atendimento */}
       <div className="bg-white p-6 rounded-xl border border-neutral-200 shadow-2xs space-y-4">
         <h2 className="text-sm font-bold text-neutral-900 flex items-center gap-2 border-b pb-2">
           <Sliders className="h-4 w-4 text-brand-600" /> Parâmetros de Atendimento & Follow-Up
@@ -164,7 +225,7 @@ export default function IaConfigPage() {
               onChange={(e) => setJanelaRetomadaDias(Number(e.target.value))}
               className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300"
             />
-            <span className="text-[10px] text-neutral-400">Faixa: 1 a 90 dias (PRD §17.9)</span>
+            <span className="text-[10px] text-neutral-400">Faixa: 1 a 90 dias</span>
           </div>
 
           <div>
@@ -179,16 +240,17 @@ export default function IaConfigPage() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-neutral-700">Máx. Tentativas Follow-up:</label>
+            <label className="text-xs font-semibold text-neutral-700">Temperatura (Criatividade):</label>
             <input
               type="number"
-              min={1}
-              max={5}
-              value={maxTentativasFollowup}
-              onChange={(e) => setMaxTentativasFollowup(Number(e.target.value))}
+              step={0.1}
+              min={0}
+              max={1}
+              value={temperatura}
+              onChange={(e) => setTemperatura(Number(e.target.value))}
               className="w-full mt-1 px-3 py-2 text-xs rounded-lg border border-neutral-300"
             />
-            <span className="text-[10px] text-neutral-400">Faixa: 1 a 5 disparos</span>
+            <span className="text-[10px] text-neutral-400">Faixa: 0.0 a 1.0</span>
           </div>
         </div>
       </div>

@@ -11,7 +11,10 @@ class IaConfigModel(BaseModel):
     tenant_id: str
     persona_nome: str = "Atendente da Alfaia"
     prompt_sistema: str = "Você é a atendente virtual da Alfaia Alta Costura. Seu tom é elegante, acolhedor e atencioso."
-    modelo: str = "claude-sonnet-4-6"
+    provedor: str = "openrouter"  # 'openrouter' ou 'openai'
+    openrouter_api_key: str = ""
+    openai_api_key: str = ""
+    modelo: str = "deepseek/deepseek-r1-distill-llama-70b"
     temperatura: float = Field(default=0.3, ge=0.0, le=1.0)
     janela_retomada_dias: int = Field(default=7, ge=1, le=90)
     janela_silencio_horas: int = Field(default=24, ge=1, le=168)
@@ -96,6 +99,9 @@ class IaConfigService:
         campos_permitidos = [
             "persona_nome",
             "prompt_sistema",
+            "provedor",
+            "openrouter_api_key",
+            "openai_api_key",
             "modelo",
             "janela_silencio_horas",
             "intervalo_tentativas_horas",

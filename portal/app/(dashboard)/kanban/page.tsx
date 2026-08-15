@@ -18,12 +18,10 @@ import {
 
 export type StatusLead =
   | "novo"
-  | "qualificando"
   | "orcamento"
   | "follow_up"
   | "negociando"
   | "agendado"
-  | "ganho"
   | "descartado";
 
 export interface LeadKanban {
@@ -39,12 +37,10 @@ export interface LeadKanban {
 
 const COLUNAS: { id: StatusLead; titulo: string; corBorder: string; corBg: string }[] = [
   { id: "novo", titulo: "Novo", corBorder: "border-blue-400", corBg: "bg-blue-50/50" },
-  { id: "qualificando", titulo: "Qualificando", corBorder: "border-sky-400", corBg: "bg-sky-50/50" },
   { id: "orcamento", titulo: "Orçamento", corBorder: "border-amber-400", corBg: "bg-amber-50/50" },
   { id: "follow_up", titulo: "Follow-up", corBorder: "border-purple-400", corBg: "bg-purple-50/50" },
   { id: "negociando", titulo: "Negociando", corBorder: "border-indigo-400", corBg: "bg-indigo-50/50" },
   { id: "agendado", titulo: "Agendado", corBorder: "border-teal-400", corBg: "bg-teal-50/50" },
-  { id: "ganho", titulo: "Ganho", corBorder: "border-emerald-500", corBg: "bg-emerald-50/50" },
   { id: "descartado", titulo: "Descartado", corBorder: "border-rose-400", corBg: "bg-rose-50/50" },
 ];
 
@@ -63,7 +59,7 @@ const MOCK_LEADS: LeadKanban[] = [
     id: "lead_2",
     nome: "Carla Mendes",
     telefone: "(85) 99944-5566",
-    status: "qualificando",
+    status: "orcamento",
     evento: "Formatura • Formando",
     valorEstimado: 550,
     tempoUltimoContato: "há 45 min",
@@ -140,7 +136,7 @@ export default function KanbanPage() {
             Funil de Atendimento (Kanban)
           </h1>
           <p className="text-sm text-neutral-500">
-            Acompanhe a jornada dos leads pelas 8 etapas do funil de conversão.
+            Acompanhe a jornada dos leads pelas etapas do funil de conversão.
           </p>
         </div>
 
@@ -151,8 +147,8 @@ export default function KanbanPage() {
         </div>
       </div>
 
-      {/* Board Kanban com 8 Colunas (AC 1, AC 3) */}
-      <div className="grid grid-cols-1 gap-4 overflow-x-auto pb-6 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 min-w-[1200px]">
+      {/* Board Kanban Responsivo */}
+      <div className="flex gap-4 overflow-x-auto pb-6 max-w-full">
         {COLUNAS.map((coluna) => {
           const leadsDaColuna = leads.filter((l) => l.status === coluna.id);
 
@@ -161,7 +157,7 @@ export default function KanbanPage() {
               key={coluna.id}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, coluna.id)}
-              className={`flex flex-col rounded-xl border-t-4 ${coluna.corBorder} ${coluna.corBg} border-x border-b border-neutral-200 p-3 min-h-[500px] shadow-sm transition`}
+              className={`flex flex-col rounded-xl border-t-4 ${coluna.corBorder} ${coluna.corBg} border-x border-b border-neutral-200 p-3 min-h-[500px] min-w-[280px] max-w-[340px] flex-1 flex-shrink-0 shadow-sm transition`}
             >
               {/* Header da Coluna */}
               <div className="flex items-center justify-between pb-3 mb-2 border-b border-neutral-200/80">
