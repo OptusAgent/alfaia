@@ -5,12 +5,21 @@ import { hasPermission } from "@/lib/permissions";
 import { NAV_ITEMS } from "@/lib/nav";
 import { TenantSwitcher } from "./tenant-switcher";
 import { signOut } from "./sign-out-action";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Sem middleware, a proteção das rotas privadas precisa acontecer aqui
+  if (!user) {
+    redirect("/login");
+  }
+
   const memberships = await getUserTenants();
 
   if (memberships.length === 0) {
@@ -21,6 +30,11 @@ export default async function DashboardLayout({
           <p className="text-sm text-slate-600">
             Sua conta ainda não está associada a nenhum tenant. Fale com o operador responsável pelo seu acesso.
           </p>
+          <form action={signOut} className="mt-4">
+            <button type="submit" className="text-sm text-blue-600 hover:underline">
+              Sair da conta
+            </button>
+          </form>
         </div>
       </main>
     );
@@ -62,16 +76,16 @@ export default async function DashboardLayout({
           </div>
         </div>
 
-        {/* User Avatar Card (From /frontend JPG Concept) */}
+        {/* User Avatar Card */}
         <div className="mx-3 my-3 p-3 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#EBB832] to-[#F2E7D0] text-[#072F53] font-bold flex items-center justify-center text-sm shadow">
-              JP
+              {user.email?.substring(0, 2).toUpperCase()}
             </div>
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#072F53]"></span>
           </div>
           <div className="min-w-0 flex-1">
-            <b className="block text-xs font-semibold text-white truncate">Juliana Prado</b>
+            <b className="block text-xs font-semibold text-white truncate">{user.email}</b>
             <div className="flex items-center gap-0.5 mt-0.5 text-[#EBB832]">
               {[...Array(5)].map((_, i) => (
                 <svg key={i} className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
@@ -80,7 +94,7 @@ export default async function DashboardLayout({
               ))}
             </div>
             <span className="text-[10px] text-slate-300 font-mono block truncate">
-              Especialista WebLocação
+              {activeTenant.papel.toUpperCase()}
             </span>
           </div>
         </div>
@@ -130,5 +144,3 @@ export default async function DashboardLayout({
     </div>
   );
 }
-
-
