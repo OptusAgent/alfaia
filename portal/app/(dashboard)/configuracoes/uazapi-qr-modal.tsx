@@ -207,10 +207,9 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
           {step === "qrcode" && (
             <div className="flex flex-col items-center text-center space-y-4">
               <div
-                className="rounded-2xl border-2 border-dashed p-4"
+                className="rounded-2xl border-2 border-dashed p-3 bg-white"
                 style={{
-                  borderColor: "rgba(16, 185, 129, 0.3)",
-                  background: "rgba(16, 185, 129, 0.04)",
+                  borderColor: "var(--accent-primary)",
                 }}
               >
                 {qrCodeData ? (
@@ -221,7 +220,7 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
                     className="h-56 w-56 object-contain rounded-lg"
                   />
                 ) : (
-                  <div className="flex h-56 w-56 items-center justify-center">
+                  <div className="flex h-56 w-56 items-center justify-center bg-white">
                     <RefreshCw
                       className="h-8 w-8 animate-spin"
                       style={{ color: "var(--accent-primary)" }}
