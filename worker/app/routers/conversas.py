@@ -86,3 +86,30 @@ async def descartar_lead_endpoint(lead_id: str, body: DescartarLeadRequest):
     if not res.get("sucesso"):
         raise HTTPException(status_code=400, detail=res.get("erro"))
     return res
+
+
+class DispararFollowupRequest(BaseModel):
+    mensagem_id: str
+    tenant_id: str = "tenant_piloto"
+    canal: str = "uazapi"
+    janela_aberta: bool = True
+    user_role: str = "atendente"
+
+
+@router.post("/leads/{lead_id}/followup")
+async def disparar_followup_endpoint(lead_id: str, body: DispararFollowupRequest):
+    """
+    Endpoint para disparo manual de mensagem de follow-up pelo lojista (PRD §18.2, AC 4).
+    """
+    from app.services.followup_dispatch_service import followup_dispatch_service
+    res = followup_dispatch_service.disparar_followup(
+        tenant_id=body.tenant_id,
+        lead_id=lead_id,
+        mensagem_id=body.mensagem_id,
+        canal=body.canal,
+        janela_aberta=body.janela_aberta,
+        user_role=body.user_role,
+    )
+    if not res.get("sucesso"):
+        raise HTTPException(status_code=res.get("status_code", 400), detail=res.get("erro"))
+    return res
