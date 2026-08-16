@@ -109,23 +109,36 @@ class UazapiInstanceService:
         inst.status = "gerando_qrcode"
         qrcode_url = None
 
-        # Tenta buscar QR Code real do servidor UAZAPI se a URL estiver configurada
+        # Tenta buscar QR Code real do servidor UAZAPI (protocolo uazapiGO: create -> connect)
         if inst.base_url and inst.token:
             try:
                 import httpx
-                uazapi_endpoint = f"{inst.base_url.rstrip('/')}/instance/connect/{inst.nome}"
-                headers = {"Content-Type": "application/json", "token": inst.token, "apikey": inst.token}
-                with httpx.Client(timeout=8.0) as client:
-                    res = client.post(uazapi_endpoint, headers=headers, json={"name": inst.nome})
-                    if res.status_code == 200:
-                        res_json = res.json()
-                        raw_qr = res_json.get("qrcode") or res_json.get("base64") or res_json.get("code")
-                        if raw_qr:
-                            if raw_qr.startswith("data:image"):
+                clean_base_url = inst.base_url.rstrip("/")
+                with httpx.Client(timeout=10.0) as client:
+                    # Passo 1: Criar/Obter instância (admintoken)
+                    create_res = client.post(
+                        f"{clean_base_url}/instance/create",
+                        headers={"Content-Type": "application/json", "admintoken": inst.token},
+                        json={"name": inst.nome},
+                    )
+
+                    instance_token = None
+                    if create_res.status_code == 200:
+                        c_data = create_res.json()
+                        instance_token = c_data.get("token") or (c_data.get("instance") or {}).get("token")
+
+                    # Passo 2: Conectar e obter QR Code oficial em base64 (token)
+                    if instance_token:
+                        conn_res = client.post(
+                            f"{clean_base_url}/instance/connect",
+                            headers={"Content-Type": "application/json", "token": instance_token},
+                        )
+
+                        if conn_res.status_code == 200:
+                            conn_data = conn_res.json()
+                            raw_qr = (conn_data.get("instance") or {}).get("qrcode") or conn_data.get("qrcode") or conn_data.get("base64")
+                            if raw_qr:
                                 qrcode_url = raw_qr
-                            else:
-                                import urllib.parse
-                                qrcode_url = f"https://api.qrserver.com/v1/create-qr-code/?size=350x350&data={urllib.parse.quote(raw_qr)}"
             except Exception as e:
                 logger.warning(f"Não foi possível conectar ao servidor UAZAPI em {inst.base_url}: {e}")
 

@@ -8,54 +8,75 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Nome da instância é obrigatório" }, { status: 400 });
     }
 
-    const workerUrl = (
-      process.env.WORKER_URL ||
-      process.env.NEXT_PUBLIC_WORKER_URL ||
-      "http://localhost:8000"
+    const uazapiBaseUrl = (
+      process.env.UAZAPI_BASE_URL ||
+      process.env.NEXT_PUBLIC_UAZAPI_BASE_URL ||
+      "https://optus.uazapi.com"
     ).replace(/\/$/, "");
 
-    let qrcodeUrl = "";
-    let status = "qrcode";
-    let workerConnected = false;
-    let errorMessage = "";
+    const uazapiAdminToken =
+      process.env.UAZAPI_ADMIN_TOKEN ||
+      "0TzblrcqZ04deiwH2kgLapvZuaI6fRws4sBba2E1Nwlw3rK2j4";
 
-    // 1. Chama o serviço de backend alfaia-worker (na VPS / Cloud Run) para criar a instância
+    let qrcodeUrl = "";
+    let isLiveFromUazapi = false;
+    let errorMessage = "";
+    let instanceToken = "";
+
+    // 1. Passo 1 do protocolo uazapiGO: Criar ou obter token da instância (header admintoken)
     try {
-      const createRes = await fetch(`${workerUrl}/instancias`, {
+      const createRes = await fetch(`${uazapiBaseUrl}/instance/create`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenant_id: "tenant_piloto",
-          nome: nome,
-          base_url: process.env.UAZAPI_BASE_URL || "https://api.uazapi.com",
-          token: process.env.UAZAPI_ADMIN_TOKEN || "fake_token",
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          admintoken: uazapiAdminToken,
+        },
+        body: JSON.stringify({ name: nome }),
       });
 
       if (createRes.ok) {
         const createData = await createRes.json();
-        const instId = createData.instancia?.id;
-
-        if (instId) {
-          // 2. Chama o worker para gerar o QR Code oficial da instância UAZAPI
-          const qrRes = await fetch(`${workerUrl}/instancias/${instId}/qrcode?tenant_id=tenant_piloto`, {
-            method: "POST",
-          });
-
-          if (qrRes.ok) {
-            const qrData = await qrRes.json();
-            qrcodeUrl = qrData.qrcode;
-            status = qrData.status || "qrcode";
-            workerConnected = true;
-          }
-        }
+        instanceToken = createData.token || createData.instance?.token || "";
+      } else {
+        errorMessage = `UAZAPI /instance/create retornou status ${createRes.status}`;
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro de conexão";
-      errorMessage = `Worker (${workerUrl}) inacessível: ${msg}`;
+      const msg = err instanceof Error ? err.message : "Erro de rede";
+      errorMessage = `Falha ao conectar no UAZAPI (${uazapiBaseUrl}): ${msg}`;
     }
 
-    // 3. Fallback / Dev Mode: Se o worker estiver offline ou não retornar QR Code
+    // 2. Passo 2 do protocolo uazapiGO: Conectar e gerar QR Code oficial do WhatsApp Web (header token)
+    if (instanceToken) {
+      try {
+        const connectRes = await fetch(`${uazapiBaseUrl}/instance/connect`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            token: instanceToken,
+          },
+        });
+
+        if (connectRes.ok) {
+          const connectData = await connectRes.json();
+          const rawQr =
+            connectData.instance?.qrcode ||
+            connectData.qrcode ||
+            connectData.base64;
+
+          if (rawQr) {
+            qrcodeUrl = rawQr;
+            isLiveFromUazapi = true;
+          }
+        } else {
+          errorMessage = `UAZAPI /instance/connect retornou status ${connectRes.status}`;
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Erro ao conectar";
+        errorMessage = `Falha ao obter QR Code da UAZAPI: ${msg}`;
+      }
+    }
+
+    // 3. Fallback se UAZAPI não retornar QR Code
     if (!qrcodeUrl) {
       const cleanPhone = (telefone || "5585988112233").replace(/\D/g, "");
       const pairingPayload = `2@AlfaiaWorker_${nome}_${cleanPhone},${Date.now()}`;
@@ -66,10 +87,9 @@ export async function POST(req: Request) {
       success: true,
       instancia: nome,
       telefone: telefone || null,
-      status,
+      status: "qrcode",
       qrcode: qrcodeUrl,
-      workerConnected,
-      workerUrl,
+      isLive: isLiveFromUazapi,
       error: errorMessage || null,
     });
   } catch (err: unknown) {
@@ -82,23 +102,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const instancia = searchParams.get("instancia");
 
-  const workerUrl = (
-    process.env.WORKER_URL ||
-    process.env.NEXT_PUBLIC_WORKER_URL ||
-    "http://localhost:8000"
-  ).replace(/\/$/, "");
-
-  try {
-    const res = await fetch(`${workerUrl}/instancias?tenant_id=tenant_piloto`);
-    if (res.ok) {
-      const data = await res.json();
-      const inst = (data.instancias || []).find((i: { nome: string }) => i.nome === instancia);
-      if (inst) {
-        return NextResponse.json({ status: inst.status });
-      }
-    }
-  } catch {
-    // fallback
+  if (!instancia) {
+    return NextResponse.json({ status: "desconectado" });
   }
 
   return NextResponse.json({ status: "conectando" });
