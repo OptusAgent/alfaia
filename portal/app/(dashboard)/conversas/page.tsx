@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/app/components/ui/Badge';
-import { Send, UserCheck, Bot } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 interface Conversa {
@@ -14,11 +14,18 @@ interface Conversa {
   atualizado_em: string;
 }
 
+interface DbConversaItem {
+  id: string;
+  estado: 'ia' | 'humano' | 'transbordo';
+  criada_em: string;
+  contatos?: { nome?: string; telefone?: string };
+  mensagens?: { texto: string; enviado_em: string }[];
+}
+
 export default function ConversasPage() {
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [selecionadaId, setSelecionadaId] = useState<string>('');
   const [novoTexto, setNovoTexto] = useState<string>('');
-  const [enviando, setEnviando] = useState(false);
 
   const supabase = createClient();
 
@@ -36,7 +43,7 @@ export default function ConversasPage() {
         .order('criada_em', { ascending: false });
 
       if (dbConversas && dbConversas.length > 0) {
-        const canaisMapped: Conversa[] = dbConversas.map((item: any) => {
+        const canaisMapped: Conversa[] = (dbConversas as unknown as DbConversaItem[]).map((item) => {
           const contato = item.contatos || {};
           const msgs = item.mensagens || [];
           const ultimaMsg = msgs.length > 0 ? msgs[msgs.length - 1].texto : 'Nova conversa iniciada';
