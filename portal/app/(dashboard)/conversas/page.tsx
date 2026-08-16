@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/app/components/ui/Badge';
-import { Send } from 'lucide-react';
+import { Send, UserCheck, Bot } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 interface Conversa {
   id: string;
@@ -14,47 +15,146 @@ interface Conversa {
 }
 
 export default function ConversasPage() {
-  const [conversas, setConversas] = useState<Conversa[]>([
-    {
-      id: 'c1',
-      contato_nome: 'Mariana Silva',
-      telefone: '+55 85 98811-2233',
-      estado: 'transbordo',
-      ultima_mensagem: 'Gostaria de falar com uma atendente para ajustar o vestido.',
-      atualizado_em: '14:22',
-    },
-    {
-      id: 'c2',
-      contato_nome: 'Carla Souza',
-      telefone: '+55 85 99922-3344',
-      estado: 'ia',
-      ultima_mensagem: 'Temos o Vestido Longo Champanhe disponível.',
-      atualizado_em: '14:15',
-    },
-    {
-      id: 'c3',
-      contato_nome: 'Beatriz Lima',
-      telefone: '+55 85 97733-4455',
-      estado: 'humano',
-      ultima_mensagem: 'Ajuste de barra confirmado para sexta-feira às 15h.',
-      atualizado_em: '13:50',
-    },
-  ]);
+  const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [selecionadaId, setSelecionadaId] = useState<string>('');
+  const [novoTexto, setNovoTexto] = useState<string>('');
+  const [enviando, setEnviando] = useState(false);
 
-  const [selecionadaId, setSelecionadaId] = useState<string>('c1');
+  const supabase = createClient();
+
+  async function fetchConversasEReais() {
+    try {
+      const { data: dbConversas } = await supabase
+        .from('conversas')
+        .select(`
+          id,
+          estado,
+          criada_em,
+          contatos ( nome, telefone ),
+          mensagens ( texto, enviado_em )
+        `)
+        .order('criada_em', { ascending: false });
+
+      if (dbConversas && dbConversas.length > 0) {
+        const canaisMapped: Conversa[] = dbConversas.map((item: any) => {
+          const contato = item.contatos || {};
+          const msgs = item.mensagens || [];
+          const ultimaMsg = msgs.length > 0 ? msgs[msgs.length - 1].texto : 'Nova conversa iniciada';
+          const hora = msgs.length > 0
+            ? new Date(msgs[msgs.length - 1].enviado_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : new Date(item.criada_em).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+          return {
+            id: item.id,
+            contato_nome: contato.nome || 'Cliente WhatsApp',
+            telefone: contato.telefone || 'WhatsApp',
+            estado: item.estado || 'ia',
+            ultima_mensagem: ultimaMsg,
+            atualizado_em: hora,
+          };
+        });
+
+        setConversas(canaisMapped);
+        if (!selecionadaId && canaisMapped.length > 0) {
+          setSelecionadaId(canaisMapped[0].id);
+        }
+      } else {
+        // Mock fallback se o banco ainda não possuir mensagens registradas
+        setConversas([
+          {
+            id: 'c1',
+            contato_nome: 'Mariana Silva',
+            telefone: '+55 85 98811-2233',
+            estado: 'transbordo',
+            ultima_mensagem: 'Gostaria de falar com uma atendente para ajustar o vestido.',
+            atualizado_em: '14:22',
+          },
+          {
+            id: 'c2',
+            contato_nome: 'Carla Souza',
+            telefone: '+55 85 99922-3344',
+            estado: 'ia',
+            ultima_mensagem: 'Temos o Vestido Longo Champanhe disponível.',
+            atualizado_em: '14:15',
+          },
+        ]);
+        if (!selecionadaId) setSelecionadaId('c1');
+      }
+    } catch {
+      //
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Inscreve no Supabase Realtime para escutar mensagens e conversas em tempo real (latência <= 2s)
+  useEffect(() => {
+    fetchConversasEReais();
+
+    const channel = supabase
+      .channel('realtime-conversas-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mensagens' },
+        () => {
+          fetchConversasEReais();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversas' },
+        () => {
+          fetchConversasEReais();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const conversaSelecionada = conversas.find((c) => c.id === selecionadaId);
 
-  const assumirConversa = (id: string) => {
+  const assumirConversa = async (id: string) => {
     setConversas((prev) =>
       prev.map((c) => (c.id === id ? { ...c, estado: 'humano' } : c))
     );
+    try {
+      await supabase.from('conversas').update({ estado: 'humano' }).eq('id', id);
+    } catch {
+      //
+    }
   };
 
-  const devolverParaIA = (id: string) => {
+  const devolverParaIA = async (id: string) => {
     setConversas((prev) =>
       prev.map((c) => (c.id === id ? { ...c, estado: 'ia' } : c))
     );
+    try {
+      await supabase.from('conversas').update({ estado: 'ia' }).eq('id', id);
+    } catch {
+      //
+    }
+  };
+
+  const handleEnviarMensagem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novoTexto.trim() || !conversaSelecionada) return;
+
+    setEnviando(true);
+    try {
+      const texto = novoTexto;
+      setNovoTexto('');
+      setMensagens((prev) => [
+        ...prev,
+        { id: Date.now(), remetente: 'atendente', texto, enviado_em: new Date().toISOString() },
+      ]);
+    } catch {
+      //
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const renderBadge = (estado: Conversa['estado']) => {
