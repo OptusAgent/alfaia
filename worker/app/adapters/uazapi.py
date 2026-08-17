@@ -77,6 +77,22 @@ class UazapiAdapter:
                     return value
             return ""
 
+        def get_any(source: dict[str, Any], *keys: str) -> Any:
+            if not isinstance(source, dict):
+                return ""
+
+            for key in keys:
+                if key in source and source[key] not in (None, ""):
+                    return source[key]
+
+            lower_map = {str(k).lower(): v for k, v in source.items()}
+            for key in keys:
+                value = lower_map.get(key.lower())
+                if value not in (None, ""):
+                    return value
+
+            return ""
+
         def nested(source: dict[str, Any], *path: str | int) -> Any:
             current: Any = source
             for key in path:
@@ -85,69 +101,89 @@ class UazapiAdapter:
                     continue
                 if not isinstance(current, dict):
                     return ""
-                current = current.get(key)
+                current = get_any(current, str(key))
             return current or ""
 
-        data_node = data.get("data") if isinstance(data.get("data"), dict) else {}
+        data_node = first_value(
+            get_any(data, "data", "Data", "payload", "Payload"),
+            {},
+        )
+        if not isinstance(data_node, dict):
+            data_node = {}
+
         message_node = first_value(
-            data.get("message"),
-            data_node.get("message") if isinstance(data_node, dict) else {},
+            get_any(data, "message", "Message"),
+            get_any(data_node, "message", "Message"),
             nested(data_node, "messages", 0),
+            nested(data_node, "Messages", 0),
         )
         if not isinstance(message_node, dict):
             message_node = {}
 
-        key_node = first_value(data.get("key"), data_node.get("key"), message_node.get("key"))
+        key_node = first_value(
+            get_any(data, "key", "Key"),
+            get_any(data_node, "key", "Key"),
+            get_any(message_node, "key", "Key"),
+        )
         if not isinstance(key_node, dict):
             key_node = {}
 
-        if first_value(data.get("fromMe"), data.get("wasSentByApi"), data_node.get("fromMe"), key_node.get("fromMe")) is True:
+        if first_value(
+            get_any(data, "fromMe", "FromMe"),
+            get_any(data, "wasSentByApi", "WasSentByApi"),
+            get_any(data_node, "fromMe", "FromMe"),
+            get_any(key_node, "fromMe", "FromMe"),
+        ) is True:
             return []
 
         # Extração de campos do payload UAZAPI
-        event = data.get("event") or data.get("type") or "message.received"
+        event = str(get_any(data, "event", "Event", "type", "Type", "eventType", "EventType") or "message.received").lower()
         if event not in ("message.received", "messages.upsert", "message", "messages"):
             # Apenas mensagens recebidas geram PayloadNormalizado
             return []
 
         msg_body = first_value(
-            data.get("mensagem"),
-            data.get("body"),
-            data.get("text"),
-            data_node.get("body"),
-            data_node.get("text"),
-            message_node.get("conversation"),
+            get_any(data, "mensagem", "body", "Body", "text", "Text", "conversation", "Conversation"),
+            get_any(data_node, "mensagem", "body", "Body", "text", "Text", "conversation", "Conversation"),
+            get_any(message_node, "conversation", "Conversation"),
             nested(message_node, "extendedTextMessage", "text"),
+            nested(message_node, "ExtendedTextMessage", "text"),
             nested(message_node, "imageMessage", "caption"),
+            nested(message_node, "ImageMessage", "caption"),
             nested(message_node, "videoMessage", "caption"),
+            nested(message_node, "VideoMessage", "caption"),
         )
         raw_phone = first_value(
-            data.get("telefone"),
-            data.get("from"),
-            data_node.get("from"),
-            data_node.get("remoteJid"),
-            key_node.get("remoteJid"),
-            key_node.get("participant"),
+            get_any(data, "telefone", "phone", "Phone", "number", "Number", "from", "From", "remoteJid", "RemoteJid"),
+            get_any(data_node, "telefone", "phone", "Phone", "number", "Number", "from", "From", "remoteJid", "RemoteJid", "chatId", "ChatID", "jid", "Jid"),
+            get_any(key_node, "remoteJid", "RemoteJid", "participant", "Participant"),
             ""
         )
         telefone = normalizar_telefone(raw_phone)
-        push_name = first_value(data.get("push_name"), data.get("pushName"), data_node.get("pushName"), data_node.get("senderName"), "Cliente")
+        push_name = first_value(
+            get_any(data, "push_name", "pushName", "PushName", "senderName", "SenderName"),
+            get_any(data_node, "push_name", "pushName", "PushName", "senderName", "SenderName"),
+            "Cliente",
+        )
         wa_message_id = first_value(
-            data.get("wa_message_id"),
-            data.get("id"),
-            data_node.get("id"),
-            key_node.get("id"),
+            get_any(data, "wa_message_id", "id", "ID"),
+            get_any(data_node, "id", "ID"),
+            get_any(key_node, "id", "ID"),
             "wamid.unknown",
         )
-        timestamp = first_value(data.get("timestamp"), data_node.get("timestamp"), data_node.get("messageTimestamp"), 1754570000)
-        midia_url = first_value(data.get("midia_url"), data.get("mediaUrl"), data_node.get("mediaUrl"))
-        midia_tipo = first_value(data.get("midia_tipo"), data.get("mediaType"), data_node.get("mediaType"), "image" if midia_url else "text")
+        timestamp = first_value(
+            get_any(data, "timestamp", "Timestamp", "messageTimestamp", "MessageTimestamp"),
+            get_any(data_node, "timestamp", "Timestamp", "messageTimestamp", "MessageTimestamp"),
+            1754570000,
+        )
+        midia_url = first_value(get_any(data, "midia_url", "mediaUrl", "MediaUrl"), get_any(data_node, "mediaUrl", "MediaUrl"))
+        midia_tipo = first_value(get_any(data, "midia_tipo", "mediaType", "MediaType"), get_any(data_node, "mediaType", "MediaType"), "image" if midia_url else "text")
         if midia_tipo not in ("text", "audio", "image", "document"):
             midia_tipo = "text"
 
         payload = PayloadNormalizado(
-            tenant_id=data.get("tenant_id", "00000000-0000-0000-0000-000000000001"),
-            canal_id=data.get("canal_id", "00000000-0000-0000-0000-000000000002"),
+            tenant_id=get_any(data, "tenant_id", "tenantId") or "00000000-0000-0000-0000-000000000001",
+            canal_id=get_any(data, "canal_id", "canalId") or "00000000-0000-0000-0000-000000000002",
             provider="uazapi",
             telefone=telefone,
             push_name=push_name,
@@ -156,7 +192,7 @@ class UazapiAdapter:
             midia_tipo=midia_tipo,
             wa_message_id=wa_message_id,
             timestamp=int(timestamp),
-            data_atual=data.get("data_atual", "Sexta-feira, 7 de agosto de 2026, 14:32"),
+            data_atual=get_any(data, "data_atual", "dataAtual") or "Sexta-feira, 7 de agosto de 2026, 14:32",
         )
         return [payload]
 
