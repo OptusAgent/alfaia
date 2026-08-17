@@ -11,6 +11,10 @@ import {
   Zap,
   RefreshCw,
   Plus,
+  Phone,
+  Clock3,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { UazapiQrModal } from "./uazapi-qr-modal";
 import { Badge } from "@/app/components/ui/Badge";
@@ -22,7 +26,9 @@ interface Canal {
   ativo: boolean;
   status: string;
   qualidade: string | null;
+  telefone: string | null;
   uazapi_instancia: string | null;
+  ultimo_healthcheck_em: string | null;
 }
 
 export default function ConfiguracoesPage() {
@@ -30,6 +36,9 @@ export default function ConfiguracoesPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmingChannel, setConfirmingChannel] = useState<Canal | null>(null);
+  const [editingChannel, setEditingChannel] = useState<Canal | null>(null);
+  const [deletingChannel, setDeletingChannel] = useState<Canal | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function fetchCanais() {
     try {
@@ -45,6 +54,12 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     fetchCanais();
+
+    const interval = window.setInterval(() => {
+      fetchCanais();
+    }, 12000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   async function handleToggleAtivo(canal: Canal) {
@@ -66,6 +81,69 @@ export default function ConfiguracoesPage() {
     } finally {
       setConfirmingChannel(null);
     }
+  }
+
+  async function handleSalvarEdicao(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingChannel) return;
+
+    const formData = new FormData(e.currentTarget);
+    setSaving(true);
+
+    try {
+      const res = await fetch(`/api/canais/${editingChannel.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: String(formData.get("nome") || ""),
+          telefone: String(formData.get("telefone") || ""),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao salvar instância");
+      }
+
+      setEditingChannel(null);
+      await fetchCanais();
+    } catch {
+      //
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmDeleteChannel() {
+    if (!deletingChannel) return;
+
+    setSaving(true);
+    try {
+      await fetch(`/api/canais/${deletingChannel.id}`, {
+        method: "DELETE",
+      });
+      setDeletingChannel(null);
+      await fetchCanais();
+    } catch {
+      //
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function formatPhone(phone?: string | null) {
+    if (!phone) return "Telefone não informado";
+    return phone.replace(/^55(\d{2})(\d{5})(\d{4})$/, "+55 ($1) $2-$3");
+  }
+
+  function formatLastCheck(value?: string | null) {
+    if (!value) return "Sem healthcheck";
+    return new Intl.DateTimeFormat("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+    }).format(new Date(value));
   }
 
   return (
@@ -177,7 +255,7 @@ export default function ConfiguracoesPage() {
                           : "var(--accent-blue-muted)",
                     }}
                   >
-                    {canal.provider === "UAZAPI" ? (
+                    {canal.provider.toLowerCase() === "uazapi" ? (
                       <QrCode
                         className="h-6 w-6"
                         style={{ color: "var(--accent-amber)" }}
@@ -196,7 +274,7 @@ export default function ConfiguracoesPage() {
                         className="text-[10px] font-bold uppercase tracking-wider"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        {canal.provider === "UAZAPI"
+                        {canal.provider.toLowerCase() === "uazapi"
                           ? "Canal Não Oficial (UAZAPI)"
                           : "Oficial (Meta Cloud API)"}
                       </span>
@@ -234,6 +312,17 @@ export default function ConfiguracoesPage() {
                         </Badge>
                       )}
                     </div>
+
+                    <div className="grid grid-cols-1 gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+                      <span className="flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" style={{ color: "var(--accent-blue)" }} />
+                        {formatPhone(canal.telefone)}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock3 className="h-3.5 w-3.5" style={{ color: "var(--accent-amber)" }} />
+                        Verificado em {formatLastCheck(canal.ultimo_healthcheck_em)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -253,7 +342,7 @@ export default function ConfiguracoesPage() {
                     <span>
                       Janela 24h:{" "}
                       <strong>
-                        {canal.provider === "META" ? "Sim" : "Não"}
+                        {canal.provider.toLowerCase() === "meta" ? "Sim" : "Não"}
                       </strong>
                     </span>
                   </div>
@@ -265,7 +354,7 @@ export default function ConfiguracoesPage() {
                     <span>
                       Anti-ban Delay:{" "}
                       <strong>
-                        {canal.provider === "UAZAPI" ? "Sim (1-3s)" : "N/A"}
+                        {canal.provider.toLowerCase() === "uazapi" ? "Sim (1-3s)" : "N/A"}
                       </strong>
                     </span>
                   </div>
@@ -273,7 +362,27 @@ export default function ConfiguracoesPage() {
 
                 {/* Actions */}
                 <div className="mt-5 flex items-center justify-between pt-2">
-                  {canal.provider === "UAZAPI" &&
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditingChannel(canal)}
+                      className="glass-btn glass-btn-ghost text-xs"
+                      title="Editar instância"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => setDeletingChannel(canal)}
+                      className="glass-btn glass-btn-ghost text-xs"
+                      title="Excluir instância"
+                      style={{ color: "var(--accent-coral)" }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Excluir
+                    </button>
+                  </div>
+
+                  {canal.provider.toLowerCase() === "uazapi" &&
                     canal.status !== "conectado" && (
                       <button
                         onClick={() => setModalOpen(true)}
@@ -348,6 +457,102 @@ export default function ConfiguracoesPage() {
                 className="glass-btn glass-btn-primary text-xs"
               >
                 Sim, Ativar Canal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingChannel && (
+        <div className="modal-overlay">
+          <form onSubmit={handleSalvarEdicao} className="modal-content w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <Pencil
+                className="h-5 w-5 shrink-0"
+                style={{ color: "var(--accent-primary)" }}
+              />
+              <h3
+                className="font-display text-lg font-bold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Editar Instância
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                Nome
+                <input
+                  name="nome"
+                  defaultValue={editingChannel.nome}
+                  required
+                  className="glass-input mt-1.5"
+                />
+              </label>
+              <label className="block text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                Telefone
+                <input
+                  name="telefone"
+                  defaultValue={editingChannel.telefone || ""}
+                  placeholder="5585988124477"
+                  className="glass-input mt-1.5"
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2" style={{ borderTop: "1px solid var(--line)" }}>
+              <button
+                type="button"
+                onClick={() => setEditingChannel(null)}
+                className="glass-btn glass-btn-ghost text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="glass-btn glass-btn-primary text-xs"
+              >
+                {saving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {deletingChannel && (
+        <div className="modal-overlay">
+          <div className="modal-content w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <Trash2
+                className="h-5 w-5 shrink-0"
+                style={{ color: "var(--accent-coral)" }}
+              />
+              <h3
+                className="font-display text-lg font-bold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Excluir Instância
+              </h3>
+            </div>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              Deseja remover <strong>{deletingChannel.nome}</strong> da lista de
+              canais? Ela será desativada e não aparecerá mais em configurações.
+            </p>
+            <div className="flex justify-end gap-3 pt-2" style={{ borderTop: "1px solid var(--line)" }}>
+              <button
+                onClick={() => setDeletingChannel(null)}
+                className="glass-btn glass-btn-ghost text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteChannel}
+                disabled={saving}
+                className="glass-btn glass-btn-primary text-xs"
+                style={{ background: "var(--accent-coral)" }}
+              >
+                {saving ? "Excluindo..." : "Excluir"}
               </button>
             </div>
           </div>

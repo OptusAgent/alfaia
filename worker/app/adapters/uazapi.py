@@ -71,30 +71,79 @@ class UazapiAdapter:
         except Exception:
             return []
 
+        def first_value(*values: Any) -> Any:
+            for value in values:
+                if value not in (None, ""):
+                    return value
+            return ""
+
+        def nested(source: dict[str, Any], *path: str | int) -> Any:
+            current: Any = source
+            for key in path:
+                if isinstance(current, list) and isinstance(key, int):
+                    current = current[key] if len(current) > key else None
+                    continue
+                if not isinstance(current, dict):
+                    return ""
+                current = current.get(key)
+            return current or ""
+
+        data_node = data.get("data") if isinstance(data.get("data"), dict) else {}
+        message_node = first_value(
+            data.get("message"),
+            data_node.get("message") if isinstance(data_node, dict) else {},
+            nested(data_node, "messages", 0),
+        )
+        if not isinstance(message_node, dict):
+            message_node = {}
+
+        key_node = first_value(data.get("key"), data_node.get("key"), message_node.get("key"))
+        if not isinstance(key_node, dict):
+            key_node = {}
+
+        if first_value(data.get("fromMe"), data.get("wasSentByApi"), data_node.get("fromMe"), key_node.get("fromMe")) is True:
+            return []
+
         # Extração de campos do payload UAZAPI
         event = data.get("event") or data.get("type") or "message.received"
-        if event not in ("message.received", "messages.upsert", "message"):
+        if event not in ("message.received", "messages.upsert", "message", "messages"):
             # Apenas mensagens recebidas geram PayloadNormalizado
             return []
 
-        msg_body = data.get("mensagem") or data.get("body") or data.get("text") or ""
-        raw_phone = (
-            data.get("telefone")
-            or data.get("from")
-            or data.get("data", {}).get("from")
-            or ""
+        msg_body = first_value(
+            data.get("mensagem"),
+            data.get("body"),
+            data.get("text"),
+            data_node.get("body"),
+            data_node.get("text"),
+            message_node.get("conversation"),
+            nested(message_node, "extendedTextMessage", "text"),
+            nested(message_node, "imageMessage", "caption"),
+            nested(message_node, "videoMessage", "caption"),
+        )
+        raw_phone = first_value(
+            data.get("telefone"),
+            data.get("from"),
+            data_node.get("from"),
+            data_node.get("remoteJid"),
+            key_node.get("remoteJid"),
+            key_node.get("participant"),
+            ""
         )
         telefone = normalizar_telefone(raw_phone)
-        push_name = data.get("push_name") or data.get("pushName") or "Cliente"
-        wa_message_id = (
-            data.get("wa_message_id")
-            or data.get("id")
-            or data.get("data", {}).get("id")
-            or "wamid.unknown"
+        push_name = first_value(data.get("push_name"), data.get("pushName"), data_node.get("pushName"), data_node.get("senderName"), "Cliente")
+        wa_message_id = first_value(
+            data.get("wa_message_id"),
+            data.get("id"),
+            data_node.get("id"),
+            key_node.get("id"),
+            "wamid.unknown",
         )
-        timestamp = data.get("timestamp") or 1754570000
-        midia_url = data.get("midia_url") or data.get("mediaUrl")
-        midia_tipo = data.get("midia_tipo") or data.get("mediaType") or ("image" if midia_url else "text")
+        timestamp = first_value(data.get("timestamp"), data_node.get("timestamp"), data_node.get("messageTimestamp"), 1754570000)
+        midia_url = first_value(data.get("midia_url"), data.get("mediaUrl"), data_node.get("mediaUrl"))
+        midia_tipo = first_value(data.get("midia_tipo"), data.get("mediaType"), data_node.get("mediaType"), "image" if midia_url else "text")
+        if midia_tipo not in ("text", "audio", "image", "document"):
+            midia_tipo = "text"
 
         payload = PayloadNormalizado(
             tenant_id=data.get("tenant_id", "00000000-0000-0000-0000-000000000001"),

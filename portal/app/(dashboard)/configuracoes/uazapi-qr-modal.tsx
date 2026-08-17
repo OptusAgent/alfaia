@@ -16,6 +16,7 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successNotified, setSuccessNotified] = useState(false);
 
   // Polling de status quando está exibindo o QR Code (Hook deve ser chamado incondicionalmente)
   useEffect(() => {
@@ -27,6 +28,10 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
           const data = await res.json();
           if (data.status === "conectado") {
             setStep("success");
+            if (!successNotified) {
+              setSuccessNotified(true);
+              onSuccess();
+            }
             clearInterval(interval);
           }
         } catch {
@@ -35,7 +40,7 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
       }, 3000);
     }
     return () => clearInterval(interval);
-  }, [isOpen, step, nomeInstancia]);
+  }, [isOpen, onSuccess, step, nomeInstancia, successNotified]);
 
   if (!isOpen) return null;
 
@@ -62,6 +67,7 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
       }
 
       setQrCodeData(data.qrcode || "data:image/png;base64,iVBORw0KGgoAAAANSU5EUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+      setSuccessNotified(false);
       setStep("qrcode");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Falha ao gerar QR Code";
@@ -79,6 +85,7 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
     setNomeInstancia("");
     setTelefone("");
     setQrCodeData(null);
+    setSuccessNotified(false);
   }
 
   return (

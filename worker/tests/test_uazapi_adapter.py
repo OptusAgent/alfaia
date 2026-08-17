@@ -41,6 +41,33 @@ def test_uazapi_normalizar_webhook():
     assert p.wa_message_id == "wamid.UAZAPI12345"
 
 
+def test_uazapi_normalizar_webhook_payload_aninhado_remote_jid():
+    adapter = UazapiAdapter()
+    raw_payload = json.dumps({
+        "event": "messages",
+        "data": {
+            "pushName": "Mariana",
+            "messageTimestamp": 1786900000,
+            "key": {
+                "id": "wamid.remote_nested",
+                "remoteJid": "85988124477@s.whatsapp.net",
+                "fromMe": False,
+            },
+            "message": {
+                "conversation": "Oi, queria agendar uma prova",
+            },
+        },
+    }).encode("utf-8")
+
+    normalized = adapter.normalizar_webhook(raw_payload, {})
+
+    assert len(normalized) == 1
+    assert normalized[0].telefone == "5585988124477"
+    assert normalized[0].push_name == "Mariana"
+    assert normalized[0].mensagem == "Oi, queria agendar uma prova"
+    assert normalized[0].wa_message_id == "wamid.remote_nested"
+
+
 @pytest.mark.asyncio
 async def test_uazapi_enviar_texto_headers():
     """Testa envio de texto encapsulando header 'token' (AC 1, 2)."""

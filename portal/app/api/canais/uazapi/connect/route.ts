@@ -1,6 +1,49 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+type UazapiInstance = {
+  id?: string;
+  name?: string;
+  status?: string;
+  token?: string;
+  qrcode?: string;
+  instance?: {
+    id?: string;
+    token?: string;
+    qrcode?: string;
+  };
+  base64?: string;
+};
+
+function normalizarStatusUazapi(status?: string | null) {
+  const normalized = String(status || "").toLowerCase();
+  if (["connected", "conectado", "open", "online"].includes(normalized)) {
+    return "conectado";
+  }
+  if (["connecting", "qrcode", "qr", "pairing"].includes(normalized)) {
+    return "conectando";
+  }
+  if (["disconnected", "desconectado", "close", "closed", "offline"].includes(normalized)) {
+    return "desconectado";
+  }
+  return normalized || "desconhecido";
+}
+
+function isDevLikeRuntime() {
+  return process.env.NODE_ENV !== "production";
+}
+
+function getRequiredEnv(name: string, fallbackDev?: string) {
+  const value = process.env[name];
+  if (value) return value;
+
+  if (isDevLikeRuntime() && fallbackDev) {
+    return fallbackDev;
+  }
+
+  throw new Error(`Variavel de ambiente obrigatoria ausente: ${name}`);
+}
+
 export async function POST(req: Request) {
   try {
     const { nome, telefone } = await req.json();
@@ -15,14 +58,10 @@ export async function POST(req: Request) {
       "https://optus.uazapi.com"
     ).replace(/\/$/, "");
 
-    const uazapiAdminToken =
-      process.env.UAZAPI_ADMIN_TOKEN ||
-      "0TzblrcqZ04deiwH2kgLapvZuaI6fRws4sBba2E1Nwlw3rK2j4";
+    const uazapiAdminToken = getRequiredEnv("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token");
 
     const workerUrl = (
-      process.env.WORKER_URL ||
-      process.env.NEXT_PUBLIC_WORKER_URL ||
-      "https://alfaia-worker-4ztt6gkx7a-rj.a.run.app"
+      process.env.WORKER_URL || getRequiredEnv("NEXT_PUBLIC_WORKER_URL", "http://localhost:8000")
     ).replace(/\/$/, "");
 
     let qrcodeUrl = "";
@@ -44,7 +83,7 @@ export async function POST(req: Request) {
       });
 
       if (createRes.ok) {
-        const createData = await createRes.json();
+        const createData = (await createRes.json()) as UazapiInstance;
         instanceToken = createData.token || createData.instance?.token || "";
         instanceId = createData.instance?.id || "";
       } else {
@@ -59,25 +98,37 @@ export async function POST(req: Request) {
     if (instanceToken) {
       try {
         const webhookUrl = `${workerUrl}/webhook/uazapi/${instanceToken}`;
-        const webhookRes = await fetch(`${uazapiBaseUrl}/webhook`, {
+        const webhookBody = {
+          url: webhookUrl,
+          enabled: true,
+          addUrlEvents: false,
+          addUrlTypesMessages: false,
+          events: ["messages"],
+          excludeMessages: ["wasSentByApi", "isGroupYes"],
+          excludeEvents: ["wasSentByApi", "isGroupYes"],
+        };
+
+        const webhookRes = await fetch(`${uazapiBaseUrl}/webhook/${encodeURIComponent(nome)}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             token: instanceToken,
           },
-          body: JSON.stringify({
-            url: webhookUrl,
-            enabled: true,
-            addUrlEvents: false,
-            addUrlTypesMessages: false,
-            events: ["messages"],
-            excludeMessages: ["wasSentByApi", "isGroupYes"],
-            excludeEvents: ["wasSentByApi", "isGroupYes"],
-          }),
+          body: JSON.stringify(webhookBody),
         });
 
         if (webhookRes.ok) {
           webhookCreated = true;
+        } else {
+          const fallbackWebhookRes = await fetch(`${uazapiBaseUrl}/webhook`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              token: instanceToken,
+            },
+            body: JSON.stringify(webhookBody),
+          });
+          webhookCreated = fallbackWebhookRes.ok;
         }
       } catch (err: unknown) {
         console.warn("Erro ao registrar webhook na UAZAPI:", err);
@@ -94,7 +145,7 @@ export async function POST(req: Request) {
         });
 
         if (connectRes.ok) {
-          const connectData = await connectRes.json();
+          const connectData = (await connectRes.json()) as UazapiInstance;
           const rawQr =
             connectData.instance?.qrcode ||
             connectData.qrcode ||
@@ -110,37 +161,81 @@ export async function POST(req: Request) {
       }
     }
 
+    if (!instanceToken && !isDevLikeRuntime()) {
+      return NextResponse.json(
+        {
+          error: errorMessage || "UAZAPI nao retornou token da instancia.",
+        },
+        { status: 502 }
+      );
+    }
+
     // 4. Salvar canal real no banco de dados Supabase (tabela canais)
     try {
       const supabase = await createClient();
       const { data: tenantData } = await supabase.from("tenants").select("id").limit(1).single();
       const tenantId = tenantData?.id;
 
-      if (tenantId) {
-        await supabase.from("canais").upsert(
-          {
-            tenant_id: tenantId,
-            provider: "uazapi",
-            nome: nome,
-            ativo: true,
-            uazapi_base_url: uazapiBaseUrl,
-            uazapi_instancia: nome,
-            uazapi_token: instanceToken,
-            status: isLiveFromUazapi ? "gerando_qrcode" : "desconectado",
-            qualidade: "BOA",
-          },
-          { onConflict: "tenant_id" }
-        );
+      if (!tenantId) {
+        return NextResponse.json({ error: "Nenhum tenant ativo encontrado para registrar o canal." }, { status: 400 });
+      }
+
+      const now = new Date().toISOString();
+      const payload = {
+        tenant_id: tenantId,
+        provider: "uazapi",
+        nome: nome,
+        telefone: telefone?.replace(/\D/g, "") || null,
+        ativo: true,
+        uazapi_base_url: uazapiBaseUrl,
+        uazapi_instancia: nome,
+        uazapi_token: instanceToken,
+        status: isLiveFromUazapi ? "conectando" : "desconectado",
+        qualidade: "BOA",
+        ultimo_healthcheck_em: now,
+        ultimo_status_raw: {
+          instanceId,
+          webhookCreated,
+          isLiveFromUazapi,
+          errorMessage: errorMessage || null,
+        },
+        editado_em: now,
+      };
+
+      const { data: existente } = await supabase
+        .from("canais")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("uazapi_instancia", nome)
+        .is("excluido_em", null)
+        .maybeSingle();
+
+      await supabase.from("canais").update({ ativo: false, editado_em: now }).eq("tenant_id", tenantId).neq("uazapi_instancia", nome);
+
+      const result = existente?.id
+        ? await supabase.from("canais").update(payload).eq("id", existente.id)
+        : await supabase.from("canais").insert(payload);
+
+      if (result.error) {
+        throw result.error;
       }
     } catch (e) {
-      console.warn("Aviso ao salvar canal no Supabase:", e);
+      const msg = e instanceof Error ? e.message : "Erro ao salvar canal no Supabase";
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
 
     // Fallback de exibição em ambiente sem UAZAPI remota
-    if (!qrcodeUrl) {
+    if (!qrcodeUrl && isDevLikeRuntime()) {
       const cleanPhone = (telefone || "5585988112233").replace(/\D/g, "");
       const pairingPayload = `2@AlfaiaWorker_${nome}_${cleanPhone},${Date.now()}`;
       qrcodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(pairingPayload)}`;
+    }
+
+    if (!qrcodeUrl) {
+      return NextResponse.json(
+        { error: errorMessage || "UAZAPI nao retornou QR Code da instancia." },
+        { status: 502 }
+      );
     }
 
     return NextResponse.json({
@@ -175,19 +270,32 @@ export async function GET(req: Request) {
     "https://optus.uazapi.com"
   ).replace(/\/$/, "");
 
-  const uazapiAdminToken =
-    process.env.UAZAPI_ADMIN_TOKEN ||
-    "0TzblrcqZ04deiwH2kgLapvZuaI6fRws4sBba2E1Nwlw3rK2j4";
+  const uazapiAdminToken = getRequiredEnv("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token");
 
   try {
     const res = await fetch(`${uazapiBaseUrl}/instance/fetchInstances`, {
       headers: { admintoken: uazapiAdminToken },
+      cache: "no-store",
     });
     if (res.ok) {
-      const data = await res.json();
-      const match = (data || []).find((i: { name?: string }) => i.name === instancia);
+      const data = (await res.json()) as UazapiInstance[];
+      const match = (data || []).find((i) => i.name === instancia || i.id === instancia);
       if (match) {
-        return NextResponse.json({ status: match.status || "conectando" });
+        const status = normalizarStatusUazapi(match.status);
+        const supabase = await createClient();
+        await supabase
+          .from("canais")
+          .update({
+            status,
+            qualidade: status === "conectado" ? "EXCELENTE" : "BOA",
+            ultimo_healthcheck_em: new Date().toISOString(),
+            ultimo_status_raw: match,
+            editado_em: new Date().toISOString(),
+          })
+          .eq("uazapi_instancia", instancia)
+          .is("excluido_em", null);
+
+        return NextResponse.json({ status });
       }
     }
   } catch {

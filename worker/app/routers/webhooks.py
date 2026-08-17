@@ -14,6 +14,23 @@ import os
 from app.adapters.uazapi import UazapiAdapter
 from app.services.ai_engine import ai_engine_service
 from app.services.context_builder import ContatoDTO, LeadDTO
+from app.services.supabase_rest import supabase_rest_service
+
+
+def _is_dev_like_runtime() -> bool:
+    return os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower() not in ("production", "prod")
+
+
+def _required_env(name: str, fallback_dev: str | None = None) -> str:
+    value = os.getenv(name)
+    if value:
+        return value
+
+    if _is_dev_like_runtime() and fallback_dev:
+        return fallback_dev
+
+    raise RuntimeError(f"Variavel de ambiente obrigatoria ausente: {name}")
+
 
 async def _processar_payload_background(
     provider: str,
@@ -37,12 +54,28 @@ async def _processar_payload_background(
 
         logger.info(f"Processando webhook em background [{provider}]: wa_message_id={wa_message_id}")
 
-        # 1. Normaliza o payload UAZAPI
-        uazapi_base_url = os.getenv("UAZAPI_BASE_URL", "https://optus.uazapi.com")
+        # 1. Resolve o canal real pelo token do webhook.
+        canal = await supabase_rest_service.buscar_canal_por_token(token) if token else None
+        if canal:
+            logger.info(
+                "Canal UAZAPI resolvido para webhook: canal_id=%s tenant_id=%s instancia=%s",
+                canal.get("id"),
+                canal.get("tenant_id"),
+                canal.get("uazapi_instancia"),
+            )
+        else:
+            logger.warning("Canal nao encontrado pelo token do webhook. Usando fallback de ambiente.")
+
+        # 2. Normaliza o payload UAZAPI
+        uazapi_base_url = canal.get("uazapi_base_url") if canal else _required_env("UAZAPI_BASE_URL", "https://optus.uazapi.com")
+        adapter_token = (canal.get("uazapi_token") if canal else None) or token
+        if not adapter_token:
+            adapter_token = _required_env("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token")
+
         adapter = UazapiAdapter(
             base_url=uazapi_base_url,
-            instance_name="default",
-            token=token or os.getenv("UAZAPI_ADMIN_TOKEN", "0TzblrcqZ04deiwH2kgLapvZuaI6fRws4sBba2E1Nwlw3rK2j4"),
+            instance_name=(canal.get("uazapi_instancia") if canal else None) or "default",
+            token=adapter_token,
         )
 
         payloads = adapter.normalizar_webhook(raw_body, headers)
@@ -51,6 +84,14 @@ async def _processar_payload_background(
             return
 
         payload = payloads[0]
+        if canal:
+            payload = payload.model_copy(
+                update={
+                    "tenant_id": canal.get("tenant_id"),
+                    "canal_id": canal.get("id"),
+                }
+            )
+
         telefone = payload.telefone
         mensagem_cliente = payload.mensagem
         push_name = payload.push_name or "Cliente WhatsApp"
@@ -61,13 +102,36 @@ async def _processar_payload_background(
 
         logger.info(f"Mensagem WhatsApp recebida de {push_name} ({telefone}): '{mensagem_cliente}'")
 
-        # 2. Executa a IA de Atendimento (AIEngine + LLM OpenRouter / DeepSeek)
-        contato_dto = ContatoDTO(telefone=telefone, nome=push_name)
+        await supabase_rest_service.registrar_mensagem(
+            {
+                "tenant_id": payload.tenant_id,
+                "canal_id": payload.canal_id,
+                "wa_message_id": payload.wa_message_id,
+                "de_mim": False,
+                "telefone": telefone,
+                "conteudo": mensagem_cliente,
+                "midia_url": payload.midia_url,
+                "midia_tipo": payload.midia_tipo,
+                "status": "recebido",
+            }
+        )
+
+        ia_config = await supabase_rest_service.buscar_ia_config(payload.tenant_id)
+
+        # 3. Executa a IA de Atendimento (AIEngine + LLM OpenRouter / DeepSeek)
+        contato_dto = ContatoDTO(
+            id=f"contato_{telefone}",
+            tenant_id=payload.tenant_id,
+            telefone=telefone,
+            nome=push_name,
+            primeiro_contato_em=payload.data_atual,
+        )
         lead_dto = LeadDTO(
             id=f"lead_{telefone}",
             tenant_id=payload.tenant_id,
-            status="qualificacao",
-            canal_origem=provider,
+            contato_id=contato_dto.id,
+            status="qualificando",
+            origem="whatsapp_organico",
         )
 
         res_ia = ai_engine_service.processar_atendimento(
@@ -76,6 +140,7 @@ async def _processar_payload_background(
             lead_dto=lead_dto,
             tipo_entrada="inbound_mensagem",
             mensagens_inbound=[mensagem_cliente],
+            ia_config=ia_config,
         )
 
         texto_resposta = res_ia.texto_resposta
@@ -85,6 +150,18 @@ async def _processar_payload_background(
         if texto_resposta:
             res_envio = await adapter.enviar_texto(to=telefone, text=texto_resposta)
             logger.info(f"Resposta enviada via UAZAPI para {telefone}: wa_id={res_envio.wa_message_id}")
+            await supabase_rest_service.registrar_mensagem(
+                {
+                    "tenant_id": payload.tenant_id,
+                    "canal_id": payload.canal_id,
+                    "wa_message_id": res_envio.wa_message_id,
+                    "de_mim": True,
+                    "telefone": telefone,
+                    "conteudo": texto_resposta,
+                    "midia_tipo": "text",
+                    "status": "enviado" if res_envio.sucesso else "erro",
+                }
+            )
 
     except Exception as e:
         logger.error(f"Erro ao processar webhook em background: {e}", exc_info=True)

@@ -7,6 +7,21 @@ from typing import Any
 logger = logging.getLogger("alfaia.uazapi_instance_service")
 
 
+def _is_dev_like_runtime() -> bool:
+    return os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower() not in ("production", "prod")
+
+
+def _required_env(name: str, fallback_dev: str | None = None) -> str:
+    value = os.getenv(name)
+    if value:
+        return value
+
+    if _is_dev_like_runtime() and fallback_dev:
+        return fallback_dev
+
+    raise RuntimeError(f"Variavel de ambiente obrigatoria ausente: {name}")
+
+
 class UazapiInstanceModel:
 
     def __init__(
@@ -48,8 +63,8 @@ class UazapiInstanceService:
 
     def __init__(self):
         # Instância inicial real / configurável por env
-        env_base_url = os.getenv("UAZAPI_BASE_URL", "https://api.uazapi.com")
-        env_token = os.getenv("UAZAPI_ADMIN_TOKEN", "uazapi_admin_key_prod")
+        env_base_url = _required_env("UAZAPI_BASE_URL", "https://api.uazapi.com")
+        env_token = _required_env("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token")
 
         self.instancias: list[UazapiInstanceModel] = [
             UazapiInstanceModel(

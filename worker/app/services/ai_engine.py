@@ -1,11 +1,13 @@
 import re
 import logging
+import os
 from typing import Any
 from pydantic import BaseModel
 
 from app.services.prompt_builder import PromptBuilderService, REGRAS_INVIOLAVEIS_SISTEMA
 from app.services.context_builder import ContextBuilderService, ContatoDTO, LeadDTO
 from app.services.tools_registry import tools_registry
+from app.services.openrouter_client import OpenRouterClient, openrouter_client
 
 logger = logging.getLogger("alfaia.ai_engine")
 
@@ -24,6 +26,9 @@ class AIEngineService:
     """
     Motor Principal de Atendimento de IA (PRD §8.2, §8.3, §19.1, §19.2, AC 1-7).
     """
+
+    def __init__(self, llm_client: OpenRouterClient | None = None):
+        self.llm_client = llm_client or openrouter_client
 
     @staticmethod
     def sanitizar_resposta_ia(texto: str) -> str:
@@ -48,6 +53,7 @@ class AIEngineService:
         tipo_entrada: str,
         mensagens_inbound: list[str],
         historico_mensagens: list[dict[str, Any]] | None = None,
+        ia_config: dict[str, Any] | None = None,
         lead_service: Any = None,
         simular_erro_tool: bool = False,
     ) -> AIResponseDTO:
@@ -60,7 +66,10 @@ class AIEngineService:
         )
 
         # 2. Monta o prompt do sistema em 4 blocos (Story 3.3, PRD §19.1)
-        prompt_sistema = PromptBuilderService.gerar_prompt_sistema(contexto)
+        prompt_sistema = PromptBuilderService.gerar_prompt_sistema(
+            contexto,
+            prompt_base_persona=(ia_config or {}).get("prompt_sistema"),
+        )
 
         # 3. Execução das intenções do lead e invocação de ferramentas (PRD §8.2, P3)
         tools_executadas = []
@@ -74,8 +83,39 @@ class AIEngineService:
             "conversa": {"estado": "ia"},
         }
 
-        # Simulação ou disparo real de ferramenta com base na intenção do texto
-        if simular_erro_tool:
+        mensagens_llm = [
+            {"role": "user", "content": texto_inbound},
+        ]
+        if historico_mensagens:
+            mensagens_llm = [
+                {
+                    "role": "assistant" if msg.get("remetente") in ("ia", "atendente") else "user",
+                    "content": str(msg.get("texto") or msg.get("conteudo") or ""),
+                }
+                for msg in historico_mensagens[-12:]
+                if msg.get("texto") or msg.get("conteudo")
+            ] + mensagens_llm
+
+        modelo = (
+            (ia_config or {}).get("modelo")
+            or os.getenv("OPENROUTER_MODEL")
+            or "openai/gpt-4o-mini"
+        )
+        temperatura = float((ia_config or {}).get("temperatura") or 0.3)
+
+        resposta_llm = None
+        if not simular_erro_tool:
+            resposta_llm = self.llm_client.gerar_resposta(
+                modelo=modelo,
+                prompt_sistema=prompt_sistema,
+                mensagens=mensagens_llm,
+                temperatura=temperatura,
+            )
+
+        if resposta_llm:
+            texto_resposta = resposta_llm
+        # Simulação ou fallback local de ferramenta com base na intenção do texto
+        elif simular_erro_tool:
             # P3 / AC 3: Erro de API/tool aciona abrir_transbordo sem inventar dado
             logger.warning("Simulação de erro na integração. Acionando transbordo amigável.")
             res_transbordo = tools_registry.executar_tool("abrir_transbordo", {"motivo": "Erro/timeout na API de produtos", "criticidade": "media"}, ctx_exec)

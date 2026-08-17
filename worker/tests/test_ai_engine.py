@@ -69,3 +69,26 @@ def test_erro_ferramenta_aciona_transbordo_sem_inventar_dado():
     assert res.transbordo_acionado is True
     assert "abrir_transbordo" in res.tools_executadas
     assert "Não consegui verificar os dados" in res.texto_resposta
+
+
+def test_motor_usa_openrouter_quando_llm_responde():
+    class FakeLLM:
+        def gerar_resposta(self, **kwargs):
+            assert kwargs["modelo"] == "openai/gpt-4o-mini"
+            assert "prompt_sistema" in kwargs
+            return "Claro, posso te ajudar com uma prova para casamento."
+
+    engine = AIEngineService(llm_client=FakeLLM())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="primeiro_contato",
+        mensagens_inbound=["Oi"],
+        ia_config={"modelo": "openai/gpt-4o-mini"},
+    )
+
+    assert res.texto_resposta == "Claro, posso te ajudar com uma prova para casamento."
