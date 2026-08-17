@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Any
 from fastapi import APIRouter, Request, BackgroundTasks, Header, status
 from app.services.webhook_service import webhook_service
@@ -22,6 +23,18 @@ def _required_env(name: str) -> str:
         return value
 
     raise RuntimeError(f"Variavel de ambiente obrigatoria ausente: {name}")
+
+
+def _headers_para_captura(headers: dict[str, Any]) -> dict[str, Any]:
+    sensiveis = ("authorization", "token", "apikey", "api-key", "cookie", "set-cookie", "x-api-key")
+    return {
+        key: "[redacted]" if key.lower() in sensiveis else value
+        for key, value in headers.items()
+    }
+
+
+def _url_para_captura(url: str) -> str:
+    return re.sub(r"(/webhook/(?:uazapi|meta)/)[^/?#]+", r"\1[redacted]", url)
 
 
 async def _processar_payload_background(
@@ -72,7 +85,10 @@ async def _processar_payload_background(
 
         payloads = adapter.normalizar_webhook(raw_body, headers)
         if not payloads:
-            logger.info("Nenhum payload de mensagem valido para processar no webhook.")
+            logger.info(
+                "Nenhum payload de mensagem valido para processar no webhook. diagnostico=%s",
+                adapter.diagnosticar_webhook(raw_body),
+            )
             return
 
         payload = payloads[0]
@@ -89,7 +105,12 @@ async def _processar_payload_background(
         push_name = payload.push_name or "Cliente WhatsApp"
 
         if not telefone or not mensagem_cliente:
-            logger.info("Webhook sem telefone ou texto de mensagem. Ignorando.")
+            logger.info(
+                "Webhook sem telefone ou texto de mensagem. Ignorando. phone_present=%s text_present=%s diagnostico=%s",
+                bool(telefone),
+                bool(mensagem_cliente),
+                adapter.diagnosticar_webhook(raw_body),
+            )
             return
 
         logger.info(f"Mensagem WhatsApp recebida de {push_name} ({telefone}): '{mensagem_cliente}'")
@@ -172,16 +193,28 @@ async def webhook_uazapi(
     """
     raw_body = await request.body()
     headers_dict = dict(request.headers)
+    captura_url = _url_para_captura(str(request.url))
+    captura_headers = _headers_para_captura(headers_dict)
 
     # 1. Captura bruta antes de qualquer processamento (AC 1)
     webhook_service.capturar_bruto(
         provider="uazapi",
         metodo=request.method,
-        url=str(request.url),
-        headers=headers_dict,
+        url=captura_url,
+        headers=captura_headers,
         corpo=raw_body.decode("utf-8", errors="replace"),
         tenant_id=None,
         hmac_ok=True,
+    )
+    await supabase_rest_service.registrar_webhook_captura(
+        {
+            "provider": "uazapi",
+            "metodo": request.method,
+            "url": captura_url,
+            "headers": captura_headers,
+            "corpo": raw_body.decode("utf-8", errors="replace"),
+            "hmac_ok": True,
+        }
     )
 
     # 2. Processa dentro do request: BackgroundTasks em Cloud Run pode ser interrompido
@@ -209,16 +242,28 @@ async def webhook_meta(
     """
     raw_body = await request.body()
     headers_dict = dict(request.headers)
+    captura_url = _url_para_captura(str(request.url))
+    captura_headers = _headers_para_captura(headers_dict)
 
     # Captura bruta
     webhook_service.capturar_bruto(
         provider="meta",
         metodo=request.method,
-        url=str(request.url),
-        headers=headers_dict,
+        url=captura_url,
+        headers=captura_headers,
         corpo=raw_body.decode("utf-8", errors="replace"),
         tenant_id=None,
         hmac_ok=x_hub_signature_256 is not None,
+    )
+    await supabase_rest_service.registrar_webhook_captura(
+        {
+            "provider": "meta",
+            "metodo": request.method,
+            "url": captura_url,
+            "headers": captura_headers,
+            "corpo": raw_body.decode("utf-8", errors="replace"),
+            "hmac_ok": x_hub_signature_256 is not None,
+        }
     )
 
     background_tasks.add_task(

@@ -84,6 +84,16 @@ class SupabaseRestService:
         if not res or res.status_code >= 300:
             logger.warning("Nao foi possivel registrar mensagem no Supabase: %s", res.text[:300] if res else "sem resposta")
 
+    async def registrar_webhook_captura(self, payload: dict[str, Any]) -> None:
+        res = await self._request(
+            "POST",
+            "webhook_capturas",
+            json=payload,
+            prefer="return=minimal",
+        )
+        if not res or res.status_code >= 300:
+            logger.warning("Nao foi possivel registrar captura de webhook no Supabase: %s", res.text[:300] if res else "sem resposta")
+
     async def atualizar_status_canal(self, canal_id: str, status: str, raw: dict[str, Any] | None = None) -> None:
         res = await self._request(
             "PATCH",

@@ -95,6 +95,84 @@ def test_uazapi_normalizar_webhook_payload_uazapigo_case_variants():
     assert normalized[0].wa_message_id == "wamid.uazapigo.case"
 
 
+def test_uazapi_normalizar_webhook_payload_info_chat_extended_text():
+    adapter = UazapiAdapter()
+    raw_payload = json.dumps({
+        "EventType": "messages",
+        "Data": {
+            "PushName": "Valmir",
+            "Info": {
+                "ID": "wamid.info.chat",
+                "Chat": "8599173321@s.whatsapp.net",
+            },
+            "Message": {
+                "extendedTextMessage": {
+                    "text": "Ainda nao respondeu pela automacao",
+                },
+            },
+        },
+    }).encode("utf-8")
+
+    normalized = adapter.normalizar_webhook(raw_payload, {})
+
+    assert len(normalized) == 1
+    assert normalized[0].telefone == "558599173321"
+    assert normalized[0].mensagem == "Ainda nao respondeu pela automacao"
+
+
+def test_uazapi_normalizar_webhook_payload_sender_text_fallback():
+    adapter = UazapiAdapter()
+    raw_payload = json.dumps({
+        "event": "messages",
+        "message": {
+            "sender": {
+                "id": "8599173321@s.whatsapp.net",
+                "name": "Valmir Junior",
+            },
+            "text": "Oi",
+            "id": "wamid.sender.text",
+        },
+    }).encode("utf-8")
+
+    normalized = adapter.normalizar_webhook(raw_payload, {})
+
+    assert len(normalized) == 1
+    assert normalized[0].telefone == "558599173321"
+    assert normalized[0].mensagem == "Oi"
+
+
+def test_uazapi_ignora_mensagem_enviada_pela_api_com_boolean_string():
+    adapter = UazapiAdapter()
+    raw_payload = json.dumps({
+        "event": "messages",
+        "data": {
+            "wasSentByApi": "true",
+            "key": {"remoteJid": "8599173321@s.whatsapp.net"},
+            "message": {"conversation": "Eco da propria automacao"},
+        },
+    }).encode("utf-8")
+
+    assert adapter.normalizar_webhook(raw_payload, {}) == []
+
+
+def test_uazapi_diagnostico_nao_expoe_valores_de_payload():
+    adapter = UazapiAdapter()
+    raw_payload = json.dumps({
+        "EventType": "messages",
+        "Data": {
+            "Info": {"Chat": "8599173321@s.whatsapp.net"},
+            "Message": {"Conversation": "Texto secreto do cliente"},
+        },
+    }).encode("utf-8")
+
+    diagnostico = adapter.diagnosticar_webhook(raw_payload)
+
+    assert diagnostico["json_ok"] is True
+    assert "Data.Info.Chat" in diagnostico["phone_candidate_paths"]
+    assert "Data.Message.Conversation" in diagnostico["text_candidate_paths"]
+    assert "Texto secreto do cliente" not in json.dumps(diagnostico)
+
+
 @pytest.mark.asyncio
 async def test_uazapi_enviar_texto_headers():
     """Testa envio de texto encapsulando header 'token' (AC 1, 2)."""

@@ -2,6 +2,7 @@ import json
 import logging
 import asyncio
 import random
+import re
 from typing import Any
 import httpx
 from app.adapters.base import CanalAdapter, Capabilities, PayloadNormalizado, ResultadoEnvio
@@ -59,6 +60,135 @@ class UazapiAdapter:
         return {
             "Content-Type": "application/json",
             "token": self.token,
+        }
+
+    @staticmethod
+    def _valor_verdadeiro(value: Any) -> bool:
+        if value is True:
+            return True
+        if isinstance(value, str):
+            return value.strip().lower() in ("true", "1", "yes", "sim")
+        return value == 1
+
+    @staticmethod
+    def _iter_json_paths(value: Any, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any]]:
+        items: list[tuple[tuple[str, ...], Any]] = []
+        if isinstance(value, dict):
+            for key, child in value.items():
+                child_path = (*path, str(key))
+                items.append((child_path, child))
+                items.extend(UazapiAdapter._iter_json_paths(child, child_path))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                child_path = (*path, str(index))
+                items.append((child_path, child))
+                items.extend(UazapiAdapter._iter_json_paths(child, child_path))
+        return items
+
+    @staticmethod
+    def _path_label(path: tuple[str, ...]) -> str:
+        return ".".join(path)
+
+    @classmethod
+    def _score_phone_candidate(cls, path: tuple[str, ...], value: Any) -> int:
+        if not isinstance(value, str):
+            return -1
+
+        raw = value.strip()
+        if not raw:
+            return -1
+
+        path_text = cls._path_label(path).lower()
+        digits = normalizar_telefone(raw)
+        has_whatsapp_jid = any(suffix in raw for suffix in ("@s.whatsapp.net", "@c.us"))
+        is_group_jid = "@g.us" in raw
+
+        if is_group_jid and not any(key in path_text for key in ("participant", "sender", "from")):
+            return -1
+        if not has_whatsapp_jid and not (10 <= len(digits) <= 14):
+            return -1
+
+        score = 1
+        for key in ("participant", "remotejid", "sender", "from", "chatid", "jid", "phone", "number", "telefone"):
+            if key in path_text:
+                score += 3
+        if has_whatsapp_jid:
+            score += 5
+        if 12 <= len(digits) <= 13:
+            score += 2
+        return score
+
+    @classmethod
+    def _score_text_candidate(cls, path: tuple[str, ...], value: Any) -> int:
+        if not isinstance(value, str):
+            return -1
+
+        text = value.strip()
+        if not text or len(text) > 4000:
+            return -1
+        if "@" in text and any(suffix in text for suffix in ("s.whatsapp.net", "c.us", "g.us")):
+            return -1
+        if text.startswith(("http://", "https://", "data:")):
+            return -1
+        if re.fullmatch(r"[\w.-]{18,}", text) and " " not in text:
+            return -1
+
+        path_text = cls._path_label(path).lower()
+        score = -1
+        for key in ("conversation", "text", "body", "caption", "mensagem", "message.text", "content"):
+            if key in path_text:
+                score = max(score, 3)
+        if score < 0:
+            return -1
+        if any(ch.isspace() for ch in text) or len(text) <= 80:
+            score += 1
+        return score
+
+    @classmethod
+    def _best_candidate(cls, data: Any, scorer) -> str:
+        best_score = -1
+        best_value = ""
+        for path, value in cls._iter_json_paths(data):
+            score = scorer(path, value)
+            if score > best_score:
+                best_score = score
+                best_value = value.strip() if isinstance(value, str) else str(value)
+        return best_value if best_score >= 0 else ""
+
+    @classmethod
+    def diagnosticar_webhook(cls, raw: bytes) -> dict[str, Any]:
+        """Retorna pistas estruturais do payload sem expor valores de cliente ou tokens."""
+        try:
+            data = json.loads(raw.decode("utf-8")) if raw else {}
+        except Exception:
+            return {"json_ok": False, "raw_size": len(raw or b"")}
+
+        def keys_of(value: Any) -> list[str]:
+            return list(value.keys())[:20] if isinstance(value, dict) else []
+
+        phone_paths: list[str] = []
+        text_paths: list[str] = []
+        for path, value in cls._iter_json_paths(data):
+            if len(phone_paths) < 8 and cls._score_phone_candidate(path, value) >= 0:
+                phone_paths.append(cls._path_label(path))
+            if len(text_paths) < 8 and cls._score_text_candidate(path, value) >= 0:
+                text_paths.append(cls._path_label(path))
+
+        data_node = data.get("data") or data.get("Data") or data.get("payload") or data.get("Payload")
+        message_node = {}
+        if isinstance(data_node, dict):
+            message_node = data_node.get("message") or data_node.get("Message") or {}
+        if not isinstance(message_node, dict):
+            message_node = data.get("message") or data.get("Message") or {}
+
+        return {
+            "json_ok": True,
+            "raw_size": len(raw or b""),
+            "top_level_keys": keys_of(data),
+            "data_keys": keys_of(data_node),
+            "message_keys": keys_of(message_node),
+            "phone_candidate_paths": phone_paths,
+            "text_candidate_paths": text_paths,
         }
 
     def normalizar_webhook(self, raw: bytes, headers: dict[str, Any]) -> list[PayloadNormalizado]:
@@ -128,12 +258,13 @@ class UazapiAdapter:
         if not isinstance(key_node, dict):
             key_node = {}
 
-        if first_value(
+        if self._valor_verdadeiro(first_value(
             get_any(data, "fromMe", "FromMe"),
             get_any(data, "wasSentByApi", "WasSentByApi"),
             get_any(data_node, "fromMe", "FromMe"),
+            get_any(data_node, "wasSentByApi", "WasSentByApi"),
             get_any(key_node, "fromMe", "FromMe"),
-        ) is True:
+        )):
             return []
 
         # Extração de campos do payload UAZAPI
@@ -153,12 +284,17 @@ class UazapiAdapter:
             nested(message_node, "videoMessage", "caption"),
             nested(message_node, "VideoMessage", "caption"),
         )
+        if not msg_body:
+            msg_body = self._best_candidate(data, self._score_text_candidate)
+
         raw_phone = first_value(
             get_any(data, "telefone", "phone", "Phone", "number", "Number", "from", "From", "remoteJid", "RemoteJid"),
             get_any(data_node, "telefone", "phone", "Phone", "number", "Number", "from", "From", "remoteJid", "RemoteJid", "chatId", "ChatID", "jid", "Jid"),
             get_any(key_node, "remoteJid", "RemoteJid", "participant", "Participant"),
             ""
         )
+        if not raw_phone:
+            raw_phone = self._best_candidate(data, self._score_phone_candidate)
         telefone = normalizar_telefone(raw_phone)
         push_name = first_value(
             get_any(data, "push_name", "pushName", "PushName", "senderName", "SenderName"),
@@ -191,7 +327,7 @@ class UazapiAdapter:
             midia_url=midia_url,
             midia_tipo=midia_tipo,
             wa_message_id=wa_message_id,
-            timestamp=int(timestamp),
+            timestamp=int(timestamp) if str(timestamp).isdigit() else 1754570000,
             data_atual=get_any(data, "data_atual", "dataAtual") or "Sexta-feira, 7 de agosto de 2026, 14:32",
         )
         return [payload]

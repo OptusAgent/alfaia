@@ -2,9 +2,23 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
+from app.routers.webhooks import _headers_para_captura, _url_para_captura
 from app.services.webhook_service import webhook_service
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def isola_dependencias_externas_webhook(monkeypatch):
+    class FakeSupabase:
+        async def registrar_webhook_captura(self, payload):
+            return None
+
+    async def fake_processar_payload_background(**kwargs):
+        return None
+
+    monkeypatch.setattr("app.routers.webhooks.supabase_rest_service", FakeSupabase())
+    monkeypatch.setattr("app.routers.webhooks._processar_payload_background", fake_processar_payload_background)
 
 
 def test_health_check():
@@ -47,6 +61,21 @@ def test_webhook_captura_bruta():
     assert ultimo_registro.provider == "uazapi"
     assert "user-agent" in ultimo_registro.headers
     assert "wamid.HBg22222" in ultimo_registro.corpo
+
+
+def test_webhook_captura_redige_token_e_headers_sensiveis():
+    assert _url_para_captura("https://worker.test/webhook/uazapi/token-secreto?x=1") == (
+        "https://worker.test/webhook/uazapi/[redacted]?x=1"
+    )
+    headers = _headers_para_captura({
+        "authorization": "Bearer segredo",
+        "token": "segredo",
+        "user-agent": "uazapiGO-Webhook/1.0",
+    })
+
+    assert headers["authorization"] == "[redacted]"
+    assert headers["token"] == "[redacted]"
+    assert headers["user-agent"] == "uazapiGO-Webhook/1.0"
 
 
 def test_webhook_idempotencia_duplicada():
