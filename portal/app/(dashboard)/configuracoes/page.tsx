@@ -39,14 +39,23 @@ export default function ConfiguracoesPage() {
   const [editingChannel, setEditingChannel] = useState<Canal | null>(null);
   const [deletingChannel, setDeletingChannel] = useState<Canal | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function fetchCanais() {
     try {
       const res = await fetch("/api/canais");
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao carregar canais.");
+      }
+
       setCanais(data.canais || []);
-    } catch {
-      // fallback
+      setLoadError(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao carregar canais.";
+      setLoadError(msg);
+      setCanais([]);
     } finally {
       setLoading(false);
     }
@@ -210,6 +219,19 @@ export default function ConfiguracoesPage() {
           Canais de Comunicação
           <Badge variant="neutral">{canais.length} cadastrados</Badge>
         </h2>
+
+        {loadError && (
+          <div
+            className="rounded-lg px-4 py-3 text-sm"
+            style={{
+              background: "var(--accent-coral-muted)",
+              color: "var(--accent-coral)",
+              border: "1px solid rgba(232, 76, 94, 0.22)",
+            }}
+          >
+            {loadError}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">

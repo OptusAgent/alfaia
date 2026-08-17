@@ -7,21 +7,6 @@ from typing import Any
 logger = logging.getLogger("alfaia.uazapi_instance_service")
 
 
-def _is_dev_like_runtime() -> bool:
-    return os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower() not in ("production", "prod")
-
-
-def _required_env(name: str, fallback_dev: str | None = None) -> str:
-    value = os.getenv(name)
-    if value:
-        return value
-
-    if _is_dev_like_runtime() and fallback_dev:
-        return fallback_dev
-
-    raise RuntimeError(f"Variavel de ambiente obrigatoria ausente: {name}")
-
-
 class UazapiInstanceModel:
 
     def __init__(
@@ -62,20 +47,7 @@ class UazapiInstanceService:
     """
 
     def __init__(self):
-        # Instância inicial real / configurável por env
-        env_base_url = _required_env("UAZAPI_BASE_URL", "https://api.uazapi.com")
-        env_token = _required_env("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token")
-
-        self.instancias: list[UazapiInstanceModel] = [
-            UazapiInstanceModel(
-                id="inst_piloto",
-                tenant_id="tenant_piloto",
-                nome="Instância Piloto WhatsApp (UAZAPI)",
-                base_url=env_base_url,
-                token=env_token,
-                status="conectado",
-            )
-        ]
+        self.instancias: list[UazapiInstanceModel] = []
 
     def listar_instancias(self, tenant_id: str = "tenant_piloto") -> list[dict[str, Any]]:
         return [inst.to_dict() for inst in self.instancias if inst.tenant_id == tenant_id]
@@ -158,9 +130,12 @@ class UazapiInstanceService:
                 logger.warning(f"Não foi possível conectar ao servidor UAZAPI em {inst.base_url}: {e}")
 
         if not qrcode_url:
-            import urllib.parse
-            mock_payload = f"2@AlfaiaWebSession_{inst.nome}_{inst_id},{int(datetime.now().timestamp())}"
-            qrcode_url = f"https://api.qrserver.com/v1/create-qr-code/?size=350x350&data={urllib.parse.quote(mock_payload)}"
+            inst.status = "desconectado"
+            return {
+                "sucesso": False,
+                "status_code": 502,
+                "erro": "UAZAPI nao retornou QR Code real para a instancia.",
+            }
 
         inst.qrcode = qrcode_url
         return {

@@ -17,17 +17,10 @@ from app.services.context_builder import ContatoDTO, LeadDTO
 from app.services.supabase_rest import supabase_rest_service
 
 
-def _is_dev_like_runtime() -> bool:
-    return os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower() not in ("production", "prod")
-
-
-def _required_env(name: str, fallback_dev: str | None = None) -> str:
+def _required_env(name: str) -> str:
     value = os.getenv(name)
     if value:
         return value
-
-    if _is_dev_like_runtime() and fallback_dev:
-        return fallback_dev
 
     raise RuntimeError(f"Variavel de ambiente obrigatoria ausente: {name}")
 
@@ -67,10 +60,10 @@ async def _processar_payload_background(
             logger.warning("Canal nao encontrado pelo token do webhook. Usando fallback de ambiente.")
 
         # 2. Normaliza o payload UAZAPI
-        uazapi_base_url = canal.get("uazapi_base_url") if canal else _required_env("UAZAPI_BASE_URL", "https://optus.uazapi.com")
+        uazapi_base_url = canal.get("uazapi_base_url") if canal else _required_env("UAZAPI_BASE_URL")
         adapter_token = (canal.get("uazapi_token") if canal else None) or token
         if not adapter_token:
-            adapter_token = _required_env("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token")
+            adapter_token = _required_env("UAZAPI_ADMIN_TOKEN")
 
         adapter = UazapiAdapter(
             base_url=uazapi_base_url,

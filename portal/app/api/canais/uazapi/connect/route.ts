@@ -29,17 +29,9 @@ function normalizarStatusUazapi(status?: string | null) {
   return normalized || "desconhecido";
 }
 
-function isDevLikeRuntime() {
-  return process.env.NODE_ENV !== "production";
-}
-
-function getRequiredEnv(name: string, fallbackDev?: string) {
+function getRequiredEnv(name: string) {
   const value = process.env[name];
   if (value) return value;
-
-  if (isDevLikeRuntime() && fallbackDev) {
-    return fallbackDev;
-  }
 
   throw new Error(`Variavel de ambiente obrigatoria ausente: ${name}`);
 }
@@ -58,10 +50,10 @@ export async function POST(req: Request) {
       "https://optus.uazapi.com"
     ).replace(/\/$/, "");
 
-    const uazapiAdminToken = getRequiredEnv("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token");
+    const uazapiAdminToken = getRequiredEnv("UAZAPI_ADMIN_TOKEN");
 
     const workerUrl = (
-      process.env.WORKER_URL || getRequiredEnv("NEXT_PUBLIC_WORKER_URL", "http://localhost:8000")
+      process.env.WORKER_URL || getRequiredEnv("NEXT_PUBLIC_WORKER_URL")
     ).replace(/\/$/, "");
 
     let qrcodeUrl = "";
@@ -161,7 +153,7 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!instanceToken && !isDevLikeRuntime()) {
+    if (!instanceToken) {
       return NextResponse.json(
         {
           error: errorMessage || "UAZAPI nao retornou token da instancia.",
@@ -224,13 +216,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg }, { status: 500 });
     }
 
-    // Fallback de exibição em ambiente sem UAZAPI remota
-    if (!qrcodeUrl && isDevLikeRuntime()) {
-      const cleanPhone = (telefone || "5585988112233").replace(/\D/g, "");
-      const pairingPayload = `2@AlfaiaWorker_${nome}_${cleanPhone},${Date.now()}`;
-      qrcodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(pairingPayload)}`;
-    }
-
     if (!qrcodeUrl) {
       return NextResponse.json(
         { error: errorMessage || "UAZAPI nao retornou QR Code da instancia." },
@@ -270,7 +255,7 @@ export async function GET(req: Request) {
     "https://optus.uazapi.com"
   ).replace(/\/$/, "");
 
-  const uazapiAdminToken = getRequiredEnv("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token");
+  const uazapiAdminToken = getRequiredEnv("UAZAPI_ADMIN_TOKEN");
 
   try {
     const res = await fetch(`${uazapiBaseUrl}/instance/fetchInstances`, {
@@ -299,8 +284,8 @@ export async function GET(req: Request) {
       }
     }
   } catch {
-    // fallback
+    return NextResponse.json({ status: "erro_healthcheck" }, { status: 502 });
   }
 
-  return NextResponse.json({ status: "conectando" });
+  return NextResponse.json({ status: "desconhecido" });
 }

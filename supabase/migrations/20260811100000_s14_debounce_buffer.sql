@@ -24,7 +24,7 @@ create table if not exists mensagens (
   conversa_id uuid not null references conversas(id) on delete cascade,
   lead_id uuid references leads(id) on delete set null,
   wa_message_id text,
-  remetente remetente not null default 'cliente',
+  remetente remetente not null default 'lead',
   texto text,
   midia_url text,
   midia_tipo text,

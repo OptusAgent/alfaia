@@ -109,16 +109,8 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
     assert calls["registered"][1]["status"] == "enviado"
 
 
-def test_webhook_required_env_blocks_missing_production_secret(monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "production")
+def test_webhook_required_env_blocks_missing_secret(monkeypatch):
     monkeypatch.delenv("UAZAPI_ADMIN_TOKEN", raising=False)
 
     with pytest.raises(RuntimeError, match="UAZAPI_ADMIN_TOKEN"):
         webhooks._required_env("UAZAPI_ADMIN_TOKEN")
-
-
-def test_webhook_required_env_allows_dev_fallback(monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "development")
-    monkeypatch.delenv("UAZAPI_ADMIN_TOKEN", raising=False)
-
-    assert webhooks._required_env("UAZAPI_ADMIN_TOKEN", "dev-token") == "dev-token"

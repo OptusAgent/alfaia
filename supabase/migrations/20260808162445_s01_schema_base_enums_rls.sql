@@ -10,7 +10,7 @@ create type lead_origem as enum (
 );
 create type canal_provider as enum ('uazapi','meta');
 create type remetente as enum ('lead','ia','atendente','sistema');
-create type conversa_estado as enum ('ia','pausada','transbordo');
+create type conversa_estado as enum ('ia','humano','pausada','transbordo');
 create type tipo_entrada as enum ('primeiro_contato','continuacao','retomada','reengajamento');
 
 create table tenants (

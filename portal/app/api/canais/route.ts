@@ -41,13 +41,9 @@ function normalizarStatusUazapi(status?: string | null) {
   return normalized || "desconhecido";
 }
 
-function getRequiredEnv(name: string, fallbackDev?: string) {
+function getRequiredEnv(name: string) {
   const value = process.env[name];
   if (value) return value;
-
-  if (process.env.NODE_ENV !== "production" && fallbackDev) {
-    return fallbackDev;
-  }
 
   throw new Error(`Variavel de ambiente obrigatoria ausente: ${name}`);
 }
@@ -67,7 +63,7 @@ export async function GET() {
       "https://optus.uazapi.com"
     ).replace(/\/$/, "");
 
-    const uazapiAdminToken = getRequiredEnv("UAZAPI_ADMIN_TOKEN", "dev-uazapi-admin-token");
+    const uazapiAdminToken = getRequiredEnv("UAZAPI_ADMIN_TOKEN");
 
     let realUazapiInstances: UazapiInstance[] = [];
     try {
@@ -82,7 +78,7 @@ export async function GET() {
         }
       }
     } catch {
-      // fallback
+      realUazapiInstances = [];
     }
 
     if (dbCanais && dbCanais.length > 0) {
@@ -121,25 +117,6 @@ export async function GET() {
         return c;
       }));
       return NextResponse.json({ canais: canaisComStatusReal });
-    }
-
-    // Se ainda não houver canais no banco, mapeia as instâncias reais retornadas diretamente da UAZAPI
-    if (realUazapiInstances.length > 0) {
-      const canaisReais = realUazapiInstances.map((inst, idx) => ({
-        id: inst.id || `uazapi-${idx}`,
-        tenant_id: "piloto-01",
-        provider: "uazapi",
-        nome: `WhatsApp Instância: ${inst.name || inst.id}`,
-        ativo: idx === 0,
-        telefone: null,
-        status: normalizarStatusUazapi(inst.status),
-        qualidade: normalizarStatusUazapi(inst.status) === "conectado" ? "EXCELENTE" : "BOA",
-        uazapi_instancia: inst.name || inst.id,
-        uazapi_token: inst.token || "****",
-        criado_em: inst.created || new Date().toISOString(),
-        ultimo_healthcheck_em: new Date().toISOString(),
-      }));
-      return NextResponse.json({ canais: canaisReais });
     }
 
     return NextResponse.json({ canais: [] });
