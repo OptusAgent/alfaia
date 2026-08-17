@@ -87,7 +87,7 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
         {/* Header */}
         <div
           className="flex items-center justify-between pb-4"
-          style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+          style={{ borderBottom: "1px solid var(--line)" }}
         >
           <div className="flex items-center gap-3">
             <div
@@ -174,7 +174,7 @@ export function UazapiQrModal({ isOpen, onClose, onSuccess }: UazapiQrModalProps
 
               <div
                 className="mt-6 flex justify-end gap-3 pt-4"
-                style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
+                style={{ borderTop: "1px solid var(--line)" }}
               >
                 <button
                   type="button"

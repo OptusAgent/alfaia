@@ -61,6 +61,11 @@ const ICON_COLORS: Record<string, string> = {
   nota: "var(--text-muted)",
 };
 
+const detailText = (value: unknown, fallback = "-") => {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
+};
+
 export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimelineProps) {
   const renderIconeEvento = (tipo: EventoTimeline["tipo"]) => {
     const color = ICON_COLORS[tipo] || "var(--text-muted)";
@@ -99,7 +104,7 @@ export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimel
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>Status alterado</span>:{" "}
             <span
               className="font-mono text-xs px-1.5 py-0.5 rounded"
-              style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-secondary)" }}
+              style={{ background: "var(--c3)", color: "var(--text-secondary)" }}
             >{ev.de}</span> &rarr;{" "}
             <span
               className="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
@@ -114,7 +119,7 @@ export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimel
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>Interesse/Evento atualizado</span>
             {ev.detalhe && (
               <div className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                Evento: {ev.detalhe.evento || "—"} | Estilo: {ev.detalhe.estilo || "—"}
+                Evento: {detailText(ev.detalhe.evento, "—")} | Estilo: {detailText(ev.detalhe.estilo, "—")}
               </div>
             )}
           </div>
@@ -123,9 +128,9 @@ export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimel
         return (
           <div>
             <span className="font-semibold" style={{ color: "var(--text-primary)" }}>Follow-up automático enviado</span>
-            {ev.detalhe?.mensagem && (
+            {ev.detalhe && Boolean(ev.detalhe.mensagem) && (
               <p className="text-xs italic mt-0.5" style={{ color: "var(--text-muted)" }}>
-                &quot;{ev.detalhe.mensagem}&quot;
+                &quot;{detailText(ev.detalhe.mensagem)}&quot;
               </p>
             )}
           </div>
@@ -157,7 +162,7 @@ export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimel
             <span className="font-semibold" style={{ color: "var(--accent-primary)" }}>Agendamento criado na WebLocação</span>
             {ev.detalhe && (
               <p className="text-xs font-mono mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                {ev.detalhe.tipo} - {ev.detalhe.data} às {ev.detalhe.hora}
+                {detailText(ev.detalhe.tipo)} - {detailText(ev.detalhe.data)} às {detailText(ev.detalhe.hora)}
               </p>
             )}
           </div>
@@ -193,7 +198,7 @@ export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimel
       {/* Header with Tags */}
       <div
         className="flex items-center justify-between pb-3"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderBottom: "1px solid var(--line)" }}
       >
         <h3
           className="text-sm font-bold font-display"
@@ -207,9 +212,9 @@ export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimel
               key={idx}
               className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold"
               style={{
-                background: "rgba(255, 255, 255, 0.06)",
+                background: "var(--line)",
                 color: "var(--text-secondary)",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
+                border: "1px solid var(--line)",
               }}
             >
               <Tag className="h-3 w-3" style={{ color: "var(--text-muted)" }} />
@@ -244,7 +249,7 @@ export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimel
               className="absolute -left-6 top-0.5 flex h-5 w-5 items-center justify-center rounded-full"
               style={{
                 background: "var(--bg-elevated)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
+                border: "1px solid var(--line)",
               }}
             >
               {renderIconeEvento(ev.tipo)}
@@ -254,8 +259,8 @@ export default function LeadTimeline({ nomeLead, tags = [], eventos }: LeadTimel
             <div
               className="flex-1 rounded-lg p-2.5 space-y-1"
               style={{
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.04)",
+                background: "var(--line2)",
+                border: "1px solid var(--c2)",
               }}
             >
               <div className="flex items-center justify-between">

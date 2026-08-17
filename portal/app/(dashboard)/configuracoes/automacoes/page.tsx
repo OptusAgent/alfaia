@@ -56,7 +56,7 @@ export default function AutomacoesPage() {
       {/* Header */}
       <div
         className="flex items-center justify-between pb-4"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderBottom: "1px solid var(--line)" }}
       >
         <div>
           <h1
@@ -75,8 +75,8 @@ export default function AutomacoesPage() {
         <div
           className="flex items-center gap-2 p-1.5 rounded-lg text-xs"
           style={{
-            background: "rgba(255, 255, 255, 0.04)",
-            border: "1px solid rgba(255, 255, 255, 0.06)",
+            background: "var(--c2)",
+            border: "1px solid var(--line)",
           }}
         >
           <span className="font-semibold" style={{ color: "var(--text-muted)" }}>
@@ -145,7 +145,7 @@ export default function AutomacoesPage() {
                 <span
                   className="font-mono text-[10px] px-2 py-0.5 rounded-md"
                   style={{
-                    background: "rgba(255, 255, 255, 0.06)",
+                    background: "var(--line)",
                     color: "var(--text-muted)",
                   }}
                 >
@@ -181,7 +181,7 @@ export default function AutomacoesPage() {
                 style={{
                   backgroundColor: item.ativo
                     ? "var(--accent-primary)"
-                    : "rgba(255, 255, 255, 0.1)",
+                    : "var(--line)",
                 }}
               >
                 <span

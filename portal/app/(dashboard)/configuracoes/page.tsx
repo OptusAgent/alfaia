@@ -73,7 +73,7 @@ export default function ConfiguracoesPage() {
       {/* Header */}
       <div
         className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderBottom: "1px solid var(--line)" }}
       >
         <div>
           <h1
@@ -241,7 +241,7 @@ export default function ConfiguracoesPage() {
                 <div
                   className="mt-5 pt-4 grid grid-cols-2 gap-2 text-xs"
                   style={{
-                    borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderTop: "1px solid var(--line)",
                     color: "var(--text-secondary)",
                   }}
                 >
@@ -335,7 +335,7 @@ export default function ConfiguracoesPage() {
             </p>
             <div
               className="flex justify-end gap-3 pt-2"
-              style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
+              style={{ borderTop: "1px solid var(--line)" }}
             >
               <button
                 onClick={() => setConfirmingChannel(null)}

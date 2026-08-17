@@ -19,7 +19,7 @@ export function TenantSwitcher({
     return (
       <span
         className="text-sm font-medium"
-        style={{ color: "var(--text-secondary)" }}
+        style={{ color: "currentColor" }}
       >
         {memberships[0]?.nome ?? "—"}
       </span>

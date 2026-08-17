@@ -90,7 +90,7 @@ export default function FollowupDispatchModal({
         {/* Header */}
         <div
           className="flex items-center justify-between pb-3"
-          style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+          style={{ borderBottom: "1px solid var(--line)" }}
         >
           <div>
             <h3
@@ -167,11 +167,11 @@ export default function FollowupDispatchModal({
                     background:
                       selectedTemplateId === tpl.id
                         ? "var(--accent-primary-muted)"
-                        : "rgba(255, 255, 255, 0.04)",
+                        : "var(--c2)",
                     border:
                       selectedTemplateId === tpl.id
                         ? "1px solid rgba(16, 185, 129, 0.3)"
-                        : "1px solid rgba(255, 255, 255, 0.06)",
+                        : "1px solid var(--line)",
                     opacity: isInvalid ? 0.5 : 1,
                     cursor: isInvalid ? "not-allowed" : "pointer",
                   }}
@@ -219,7 +219,7 @@ export default function FollowupDispatchModal({
         {/* Actions */}
         <div
           className="flex items-center justify-end gap-3 pt-3"
-          style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
+          style={{ borderTop: "1px solid var(--line)" }}
         >
           <button onClick={onClose} className="glass-btn glass-btn-ghost text-xs">
             Cancelar

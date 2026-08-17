@@ -48,7 +48,7 @@ export default function IaConfigPage() {
       {/* Header */}
       <div
         className="flex items-center justify-between pb-4"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderBottom: "1px solid var(--line)" }}
       >
         <div>
           <h1
@@ -67,8 +67,8 @@ export default function IaConfigPage() {
         <div
           className="flex items-center gap-2 p-1.5 rounded-lg text-xs"
           style={{
-            background: "rgba(255, 255, 255, 0.04)",
-            border: "1px solid rgba(255, 255, 255, 0.06)",
+            background: "var(--c2)",
+            border: "1px solid var(--line)",
           }}
         >
           <span className="font-semibold" style={{ color: "var(--text-muted)" }}>
@@ -122,7 +122,7 @@ export default function IaConfigPage() {
           className="text-sm font-bold flex items-center gap-2 pb-2"
           style={{
             color: "var(--text-primary)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            borderBottom: "1px solid var(--line)",
           }}
         >
           <Cpu className="h-4 w-4" style={{ color: "var(--accent-primary)" }} />
@@ -216,7 +216,7 @@ export default function IaConfigPage() {
           className="text-sm font-bold flex items-center gap-2 pb-2"
           style={{
             color: "var(--text-primary)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            borderBottom: "1px solid var(--line)",
           }}
         >
           <Sparkles className="h-4 w-4" style={{ color: "var(--accent-primary)" }} />
@@ -295,7 +295,7 @@ export default function IaConfigPage() {
           className="text-sm font-bold flex items-center gap-2 pb-2"
           style={{
             color: "var(--text-primary)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            borderBottom: "1px solid var(--line)",
           }}
         >
           <Sliders className="h-4 w-4" style={{ color: "var(--accent-primary)" }} />

@@ -31,12 +31,12 @@ export interface LeadKanban {
 }
 
 const COLUNAS: { id: StatusLead; titulo: string; cor: string }[] = [
-  { id: "novo", titulo: "Novo", cor: "#3B82F6" },
-  { id: "orcamento", titulo: "Orçamento", cor: "#F59E0B" },
-  { id: "follow_up", titulo: "Follow-up", cor: "#8B5CF6" },
-  { id: "negociando", titulo: "Negociando", cor: "#6366F1" },
-  { id: "agendado", titulo: "Agendado", cor: "#10B981" },
-  { id: "descartado", titulo: "Descartado", cor: "#F43F5E" },
+  { id: "novo", titulo: "Novo", cor: "var(--dim)" },
+  { id: "orcamento", titulo: "Orçamento", cor: "var(--warn)" },
+  { id: "follow_up", titulo: "Follow-up", cor: "var(--bad)" },
+  { id: "negociando", titulo: "Negociando", cor: "var(--gold-ink)" },
+  { id: "agendado", titulo: "Agendado", cor: "var(--teal-ink)" },
+  { id: "descartado", titulo: "Descartado", cor: "var(--ice-ink)" },
 ];
 
 const MOCK_LEADS: LeadKanban[] = [
@@ -121,30 +121,52 @@ export default function KanbanPage() {
   };
 
   return (
-    <section aria-labelledby="kanban-title" className="space-y-6">
-      {/* Header */}
+    <section aria-labelledby="kanban-title" className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1
             id="kanban-title"
-            className="text-xl font-bold font-display flex items-center gap-2"
+            className="section-heading flex items-center gap-2"
             style={{ color: "var(--text-primary)" }}
           >
             <KanbanIcon className="h-6 w-6" style={{ color: "var(--accent-primary)" }} />
-            Funil de Atendimento
+            Pipeline de leads
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Acompanhe a jornada dos leads pelas etapas do funil de conversão.
+          <p className="section-subtitle">
+            Todo lead que chega, do primeiro oi ao contrato.
           </p>
         </div>
 
         <Badge variant="neutral">
-          Total no Funil: <strong style={{ color: "var(--accent-primary)" }}>{leads.length}</strong> leads
+          Total no quadro: <strong style={{ color: "var(--accent-primary)" }}>{leads.length}</strong> leads
         </Badge>
       </div>
 
-      {/* Board */}
-      <div className="flex gap-4 overflow-x-auto pb-6 max-w-full">
+      <div className="fluir-tiles">
+        <div className="fluir-tile t-mint">
+          <div className="label">
+            Leads ativos
+          </div>
+          <div className="value">{leads.filter((l) => l.status !== "descartado").length}</div>
+          <div className="desc">no quadro agora</div>
+        </div>
+        <div className="fluir-tile t-pump">
+          <div className="label">
+            Aguardando follow-up
+          </div>
+          <div className="value">{leads.filter((l) => l.status === "follow_up").length}</div>
+          <div className="desc">botão de disparo ativo</div>
+        </div>
+        <div className="fluir-tile t-ice">
+          <div className="label">
+            Provas agendadas
+          </div>
+          <div className="value">{leads.filter((l) => l.status === "agendado").length}</div>
+          <div className="desc">pela automação</div>
+        </div>
+      </div>
+
+      <div className="flex max-w-full gap-3 overflow-x-auto pb-3">
         {COLUNAS.map((coluna) => {
           const leadsDaColuna = leads.filter((l) => l.status === coluna.id);
 
@@ -153,29 +175,29 @@ export default function KanbanPage() {
               key={coluna.id}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, coluna.id)}
-              className="flex flex-col rounded-xl min-h-[500px] min-w-[280px] max-w-[340px] flex-1 flex-shrink-0 p-3 transition-all"
+              className="flex min-h-[560px] min-w-[236px] flex-1 flex-shrink-0 flex-col rounded-[14px] p-0 transition-all"
               style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                borderTopWidth: "3px",
-                borderTopColor: coluna.cor,
+                background: "var(--c2)",
+                border: "1px solid var(--line)",
+                borderRadius: "var(--r)",
               }}
             >
-              {/* Column Header */}
               <div
-                className="flex items-center justify-between pb-3 mb-2"
-                style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+                className="flex items-center gap-2 px-[14px] py-3"
+                style={{ borderBottom: "1px solid var(--line)" }}
               >
+                <span className="h-2 w-2 rounded-full" style={{ background: coluna.cor }} />
                 <h2
-                  className="text-xs font-bold uppercase tracking-wider"
+                  className="flex-1 text-[12.3px] font-bold"
                   style={{ color: "var(--text-secondary)" }}
                 >
                   {coluna.titulo}
                 </h2>
                 <span
-                  className="rounded-full px-2 py-0.5 text-xs font-bold"
+                  className="rounded-full border px-2 py-0.5 font-mono text-[10.5px]"
                   style={{
-                    background: "rgba(255, 255, 255, 0.06)",
+                    background: "var(--card)",
+                    borderColor: "var(--line)",
                     color: "var(--text-muted)",
                   }}
                 >
@@ -183,26 +205,34 @@ export default function KanbanPage() {
                 </span>
               </div>
 
-              {/* Cards */}
-              <div className="space-y-3 flex-1">
+              <div className="flex flex-1 flex-col gap-[9px] overflow-y-auto p-[10px]">
                 {leadsDaColuna.map((lead) => (
                   <div
                     key={lead.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
-                    className="group relative rounded-lg p-3 cursor-grab active:cursor-grabbing space-y-2.5 transition-all"
+                    className="group relative cursor-grab space-y-2 rounded-[8px] p-3 transition-all active:cursor-grabbing"
                     style={{
-                      background: "rgba(255, 255, 255, 0.04)",
-                      border: "1px solid rgba(255, 255, 255, 0.06)",
+                      background: "var(--card)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "12px",
+                      boxShadow: "var(--shadow-md)",
                     }}
                   >
-                    {/* Top */}
                     <div className="flex items-start justify-between gap-2">
-                      <div
-                        className="font-bold text-sm"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        {lead.nome}
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full text-[10px] font-bold"
+                          style={{ background: "var(--line-2)", color: "var(--ink-2)" }}
+                        >
+                          {lead.nome.split(" ").map((x) => x[0]).slice(0, 2).join("")}
+                        </span>
+                        <div
+                          className="truncate text-[12.4px] font-bold"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {lead.nome}
+                        </div>
                       </div>
                       {lead.statusAlteradoPor === "humano" ? (
                         <Badge variant="purple">Humano</Badge>
@@ -211,8 +241,7 @@ export default function KanbanPage() {
                       )}
                     </div>
 
-                    {/* Metadata */}
-                    <div className="text-xs space-y-1" style={{ color: "var(--text-secondary)" }}>
+                    <div className="space-y-1 text-[11.5px]" style={{ color: "var(--text-muted)" }}>
                       {lead.evento && (
                         <div className="flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "var(--text-muted)" }} />
@@ -223,15 +252,15 @@ export default function KanbanPage() {
                       {lead.valorEstimado && (
                         <div className="flex items-center gap-1.5 font-semibold" style={{ color: "var(--accent-primary)" }}>
                           <DollarSign className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span>R$ {lead.valorEstimado.toFixed(2)}</span>
+                          <span>R$ {lead.valorEstimado.toFixed(2).replace(".", ",")}</span>
                         </div>
                       )}
 
                       <div
-                        className="flex items-center gap-1.5 text-[11px] pt-1"
+                        className="flex items-center gap-1.5 pt-2 font-mono text-[9.5px]"
                         style={{
                           color: "var(--text-muted)",
-                          borderTop: "1px solid rgba(255, 255, 255, 0.04)",
+                          borderTop: "1px solid var(--line2)",
                         }}
                       >
                         <Clock className="h-3 w-3 flex-shrink-0" />
@@ -239,15 +268,14 @@ export default function KanbanPage() {
                       </div>
                     </div>
 
-                    {/* Actions */}
                     <div
                       className="pt-2 flex items-center justify-between text-xs"
-                      style={{ borderTop: "1px solid rgba(255, 255, 255, 0.04)" }}
+                      style={{ borderTop: "1px solid var(--line2)" }}
                     >
                       <Link
                         href={`/conversas?lead_id=${lead.id}`}
                         className="inline-flex items-center gap-1 text-[11px] font-medium hover:underline"
-                        style={{ color: "var(--accent-primary)" }}
+                        style={{ color: "var(--teal-ink)" }}
                       >
                         <MessageSquare className="h-3 w-3" /> Abrir Chat
                       </Link>
@@ -256,7 +284,7 @@ export default function KanbanPage() {
                         aria-label={`Mover lead ${lead.nome}`}
                         value={lead.status}
                         onChange={(e) => moverStatus(lead.id, e.target.value as StatusLead)}
-                        className="glass-select text-[10px] py-0.5 px-1"
+                        className="glass-select py-0.5 pl-2 pr-7 text-[10px]"
                         style={{ width: "auto" }}
                       >
                         {COLUNAS.map((c) => (
@@ -271,9 +299,9 @@ export default function KanbanPage() {
 
                 {leadsDaColuna.length === 0 && (
                   <div
-                    className="h-24 flex items-center justify-center rounded-lg text-xs italic"
+                    className="flex h-24 items-center justify-center rounded-[8px] text-xs italic"
                     style={{
-                      border: "1px dashed rgba(255, 255, 255, 0.1)",
+                      border: "1px dashed var(--line)",
                       color: "var(--text-muted)",
                     }}
                   >

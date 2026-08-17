@@ -56,41 +56,37 @@ export default function ContatosPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
+    <div className="mx-auto max-w-7xl space-y-5">
       <div
-        className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        className="flex flex-col justify-between gap-4 md:flex-row md:items-center"
       >
         <div>
           <h1
-            className="text-2xl font-bold font-display flex items-center gap-2.5"
+            className="section-heading flex items-center gap-2.5"
             style={{ color: "var(--text-primary)" }}
           >
             <Users className="h-7 w-7" style={{ color: "var(--accent-primary)" }} />
-            Base de Contatos & Remarketing
+            Base de contatos
           </h1>
-          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-            Repositório permanente de clientes com tags históricas para campanhas sazonais.
+          <p className="section-subtitle">
+            Quem já falou com a loja, inclusive quem desistiu.
           </p>
         </div>
         <Badge variant="neutral">
-          Total na Base: <strong>{CONTATOS_MOCK.length} contatos</strong>
+          Total na base: <strong>{CONTATOS_MOCK.length} contatos</strong>
         </Badge>
       </div>
 
-      {/* Filtros */}
-      <div className="glass-card p-4 space-y-4">
+      <div className="glass-card space-y-4 p-4">
         <div
-          className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider"
+          className="flex items-center gap-2 font-mono text-[8.6px] uppercase tracking-[0.15em]"
           style={{ color: "var(--text-secondary)" }}
         >
           <Filter className="h-4 w-4" style={{ color: "var(--accent-primary)" }} />
-          Filtros de Segmentação
+          Filtros de segmentação
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Search */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="relative">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
@@ -105,7 +101,6 @@ export default function ContatosPage() {
             />
           </div>
 
-          {/* Status Filter */}
           <select
             value={filtroStatus}
             onChange={(e) => setFiltroStatus(e.target.value)}
@@ -117,7 +112,6 @@ export default function ContatosPage() {
             <option value="negociando">Em Negociação</option>
           </select>
 
-          {/* Tag Filter */}
           <select
             value={filtroTag}
             onChange={(e) => setFiltroTag(e.target.value)}
@@ -132,12 +126,10 @@ export default function ContatosPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div
-        className="rounded-xl overflow-hidden"
+        className="glass-card overflow-hidden"
         style={{
-          background: "rgba(255, 255, 255, 0.02)",
-          border: "1px solid rgba(255, 255, 255, 0.06)",
+          boxShadow: "var(--shadow-md)",
         }}
       >
         <table className="dark-table">
@@ -176,11 +168,11 @@ export default function ContatosPage() {
                     {contato.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-medium"
+                        className="inline-flex items-center gap-0.5 rounded-[6px] px-2 py-0.5 text-[10px] font-medium"
                         style={{
-                          background: "rgba(255, 255, 255, 0.06)",
+                          background: "var(--c3)",
                           color: "var(--text-secondary)",
-                          border: "1px solid rgba(255, 255, 255, 0.06)",
+                          border: "1px solid var(--line)",
                         }}
                       >
                         <Tag className="h-2.5 w-2.5" style={{ color: "var(--text-muted)" }} />

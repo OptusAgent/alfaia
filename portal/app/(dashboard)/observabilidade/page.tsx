@@ -80,7 +80,7 @@ export default function ObservabilidadePage() {
       {/* Header */}
       <div
         className="flex items-center justify-between pb-4"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderBottom: "1px solid var(--line)" }}
       >
         <div>
           <h1
@@ -140,7 +140,7 @@ export default function ObservabilidadePage() {
           className="text-sm font-bold flex items-center gap-2 pb-2"
           style={{
             color: "var(--text-primary)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            borderBottom: "1px solid var(--line)",
           }}
         >
           <AlertTriangle
@@ -211,12 +211,12 @@ export default function ObservabilidadePage() {
         className="p-6 rounded-xl space-y-3 font-mono text-xs"
         style={{
           background: "#08090D",
-          border: "1px solid rgba(255, 255, 255, 0.06)",
+          border: "1px solid var(--line)",
         }}
       >
         <div
           className="flex items-center justify-between pb-2"
-          style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+          style={{ borderBottom: "1px solid var(--line)" }}
         >
           <span
             className="font-bold flex items-center gap-2"

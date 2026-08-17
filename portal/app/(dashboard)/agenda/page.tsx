@@ -79,36 +79,32 @@ export default function AgendaPage() {
   };
 
   return (
-    <section aria-labelledby="agenda-title" className="space-y-6">
-      {/* Warning Banner */}
+    <section aria-labelledby="agenda-title" className="space-y-5">
       <div
-        className="flex items-center gap-3 rounded-xl p-4"
+        className="flex items-center gap-3 rounded-[8px] p-4"
         style={{
-          background: "var(--accent-amber-muted)",
-          border: "1px solid var(--accent-amber-border)",
+          background: "var(--slate-l)",
+          border: "1px solid rgba(74, 107, 132, 0.2)",
         }}
       >
-        <Info className="h-5 w-5 flex-shrink-0" style={{ color: "var(--accent-amber)" }} />
-        <div className="text-sm font-medium" style={{ color: "var(--accent-amber)" }}>
-          <strong>Aviso de Integração WebLocação:</strong> Esta tela é{" "}
-          <u>somente leitura</u>. Alterações devem ser efetuadas no portal da
-          WebLocação.
+        <Info className="h-5 w-5 flex-shrink-0" style={{ color: "var(--slate)" }} />
+        <div className="text-[12.3px]" style={{ color: "var(--ink2)" }}>
+          Visualização apenas. Remarcar, cancelar ou criar manualmente é feito no portal da WebLocação.
         </div>
       </div>
 
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1
             id="agenda-title"
-            className="text-xl font-bold font-display flex items-center gap-2"
+            className="section-heading flex items-center gap-2"
             style={{ color: "var(--text-primary)" }}
           >
             <Calendar className="h-6 w-6" style={{ color: "var(--accent-primary)" }} />
-            Agenda de Atendimentos
+            Agenda
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Sincronização bidirecional em tempo real com a WebLocação ERP.
+          <p className="section-subtitle">
+            Provas e atendimentos, leitura da WebLocação.
           </p>
         </div>
 
@@ -123,13 +119,12 @@ export default function AgendaPage() {
         </button>
       </div>
 
-      {/* Period Selector + Origin Filter */}
       <div
-        className="glass-card p-4 flex flex-wrap items-center justify-between gap-4"
+        className="glass-card flex flex-wrap items-center justify-between gap-4 p-4"
       >
         <div
-          className="flex items-center gap-1 rounded-lg p-1 text-xs font-semibold"
-          style={{ background: "rgba(0, 0, 0, 0.2)" }}
+          className="flex items-center gap-1 rounded-[8px] border p-1 text-xs font-semibold"
+          style={{ background: "var(--c2)", borderColor: "var(--line)" }}
         >
           {(["dia", "semana", "mes", "custom"] as const).map((p) => (
             <button
@@ -139,7 +134,7 @@ export default function AgendaPage() {
               className="rounded-md px-3 py-1.5 capitalize transition-all"
               style={{
                 background: periodo === p ? "var(--accent-primary-muted)" : "transparent",
-                color: periodo === p ? "var(--accent-primary)" : "var(--text-muted)",
+                color: periodo === p ? "var(--ink)" : "var(--text-muted)",
               }}
             >
               {p === "mes" ? "Mês" : p === "custom" ? "Customizado" : p}
@@ -166,12 +161,10 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div
-        className="overflow-hidden rounded-xl"
+        className="glass-card overflow-hidden"
         style={{
-          background: "rgba(255, 255, 255, 0.02)",
-          border: "1px solid rgba(255, 255, 255, 0.06)",
+          boxShadow: "var(--shadow-md)",
         }}
       >
         <table className="dark-table">
@@ -206,7 +199,7 @@ export default function AgendaPage() {
                   <span
                     className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
                     style={{
-                      background: "rgba(255, 255, 255, 0.06)",
+                      background: "var(--line)",
                       color: "var(--text-secondary)",
                     }}
                   >

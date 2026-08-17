@@ -10,10 +10,10 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Kanban", href: "/kanban", anyOf: [{ recurso: "lead", acao: "read" }] },
-  { label: "Conversas", href: "/conversas", anyOf: [{ recurso: "atendimento", acao: "read" }] },
+  { label: "Pipeline", href: "/kanban", anyOf: [{ recurso: "lead", acao: "read" }] },
+  { label: "Atendimento", href: "/conversas", anyOf: [{ recurso: "atendimento", acao: "read" }] },
   { label: "Agenda", href: "/agenda", anyOf: [{ recurso: "agenda", acao: "read" }] },
-  { label: "Contatos", href: "/contatos", anyOf: [{ recurso: "contato", acao: "read" }] },
+  { label: "Base de contatos", href: "/contatos", anyOf: [{ recurso: "contato", acao: "read" }] },
   {
     label: "Configurações",
     href: "/configuracoes",
