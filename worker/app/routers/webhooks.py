@@ -1,9 +1,8 @@
 import json
 import logging
 from typing import Any
-from fastapi import APIRouter, Request, BackgroundTasks, Header, Response, status
+from fastapi import APIRouter, Request, BackgroundTasks, Header, status
 from app.services.webhook_service import webhook_service
-from app.adapters.fake import FakeCanalAdapter
 
 logger = logging.getLogger("alfaia.webhooks_router")
 
@@ -32,7 +31,7 @@ async def _processar_payload_background(
     token: str,
 ):
     """
-    Processamento em segundo plano acionado após a devolução imediata do 200 OK (PRD §14.4, §19.1).
+    Processamento do webhook UAZAPI/Meta (PRD §14.4, §19.1).
     - Normaliza o payload UAZAPI.
     - Executa a IA (LLM Distill 70B / OpenRouter) respeitando as regras invioláveis.
     - Dispara a resposta em tempo real no WhatsApp via UazapiAdapter.
@@ -45,7 +44,7 @@ async def _processar_payload_background(
             # Mensagem duplicada — descarte silencioso conforme §21.2
             return
 
-        logger.info(f"Processando webhook em background [{provider}]: wa_message_id={wa_message_id}")
+        logger.info(f"Processando webhook [{provider}]: wa_message_id={wa_message_id}")
 
         # 1. Resolve o canal real pelo token do webhook.
         canal = await supabase_rest_service.buscar_canal_por_token(token) if token else None
@@ -165,12 +164,11 @@ async def _processar_payload_background(
 async def webhook_uazapi(
     token: str,
     request: Request,
-    background_tasks: BackgroundTasks,
 ):
     """
     Endpoint público de webhook para o canal UAZAPI (PRD §14.4 C2, AC 1-5).
     - Captura o payload cru imediatamente.
-    - Devolve HTTP 200 OK sem aguardar o processamento downstream.
+    - Processa dentro do request para manter CPU ativa no Cloud Run.
     """
     raw_body = await request.body()
     headers_dict = dict(request.headers)
@@ -186,16 +184,16 @@ async def webhook_uazapi(
         hmac_ok=True,
     )
 
-    # 2. Agenda processamento em segundo plano (AC 2)
-    background_tasks.add_task(
-        _processar_payload_background,
+    # 2. Processa dentro do request: BackgroundTasks em Cloud Run pode ser interrompido
+    # após o 200 quando a CPU volta a ser alocada sob demanda.
+    await _processar_payload_background(
         provider="uazapi",
         raw_body=raw_body,
         headers=headers_dict,
         token=token,
     )
 
-    # 3. Resposta imediata 200 OK ao provider (AC 2)
+    # 3. Resposta 200 OK ao provider após tentativa de processamento.
     return {"status": "received", "provider": "uazapi"}
 
 

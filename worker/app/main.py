@@ -1,5 +1,12 @@
+import logging
+
 from fastapi import FastAPI
 from app.routers import webhooks, conversas, agenda
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:%(name)s:%(message)s",
+)
 
 app = FastAPI(
     title="ALFAIA Worker Engine",
