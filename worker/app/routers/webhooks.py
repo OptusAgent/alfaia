@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Any
 from fastapi import APIRouter, Request, BackgroundTasks, Header, status
 from app.services.webhook_service import webhook_service
@@ -35,6 +36,15 @@ def _headers_para_captura(headers: dict[str, Any]) -> dict[str, Any]:
 
 def _url_para_captura(url: str) -> str:
     return re.sub(r"(/webhook/(?:uazapi|meta)/)[^/?#]+", r"\1[redacted]", url)
+
+
+def datetime_from_timestamp(timestamp: int | None) -> str:
+    if timestamp:
+        try:
+            return datetime.fromtimestamp(int(timestamp), timezone.utc).isoformat()
+        except (TypeError, ValueError, OSError):
+            pass
+    return datetime.now(timezone.utc).isoformat()
 
 
 async def _processar_payload_background(
@@ -115,11 +125,37 @@ async def _processar_payload_background(
 
         logger.info(f"Mensagem WhatsApp recebida de {push_name} ({telefone}): '{mensagem_cliente}'")
 
+        identidade = await supabase_rest_service.identificar_lead(
+            tenant_id=payload.tenant_id,
+            telefone=telefone,
+            push_name=push_name,
+            origem="whatsapp_organico",
+        )
+        contato_id = identidade.get("contato_id") if identidade else None
+        lead_id = identidade.get("lead_id") if identidade else None
+        tipo_entrada = identidade.get("entrada") if identidade else "inbound_mensagem"
+
+        conversa = None
+        if contato_id:
+            conversa = await supabase_rest_service.upsert_conversa(
+                tenant_id=payload.tenant_id,
+                contato_id=contato_id,
+                lead_id=lead_id,
+                canal_id=payload.canal_id,
+            )
+        conversa_id = conversa.get("id") if conversa else None
+
         await supabase_rest_service.registrar_mensagem(
             {
                 "tenant_id": payload.tenant_id,
                 "canal_id": payload.canal_id,
+                "conversa_id": conversa_id,
+                "lead_id": lead_id,
                 "wa_message_id": payload.wa_message_id,
+                "remetente": "lead",
+                "texto": mensagem_cliente,
+                "payload": data,
+                "enviado_em": datetime_from_timestamp(payload.timestamp),
                 "de_mim": False,
                 "telefone": telefone,
                 "conteudo": mensagem_cliente,
@@ -130,17 +166,22 @@ async def _processar_payload_background(
         )
 
         ia_config = await supabase_rest_service.buscar_ia_config(payload.tenant_id)
+        historico_mensagens = (
+            await supabase_rest_service.buscar_historico_mensagens(conversa_id)
+            if conversa_id
+            else []
+        )
 
         # 3. Executa a IA de Atendimento (AIEngine + LLM OpenRouter / DeepSeek)
         contato_dto = ContatoDTO(
-            id=f"contato_{telefone}",
+            id=contato_id or f"contato_{telefone}",
             tenant_id=payload.tenant_id,
             telefone=telefone,
             nome=push_name,
             primeiro_contato_em=payload.data_atual,
         )
         lead_dto = LeadDTO(
-            id=f"lead_{telefone}",
+            id=lead_id or f"lead_{telefone}",
             tenant_id=payload.tenant_id,
             contato_id=contato_dto.id,
             status="qualificando",
@@ -151,8 +192,9 @@ async def _processar_payload_background(
             tenant_id=payload.tenant_id,
             contato_dto=contato_dto,
             lead_dto=lead_dto,
-            tipo_entrada="inbound_mensagem",
+            tipo_entrada=tipo_entrada,
             mensagens_inbound=[mensagem_cliente],
+            historico_mensagens=historico_mensagens,
             ia_config=ia_config,
         )
 
@@ -167,7 +209,16 @@ async def _processar_payload_background(
                 {
                     "tenant_id": payload.tenant_id,
                     "canal_id": payload.canal_id,
+                    "conversa_id": conversa_id,
+                    "lead_id": lead_id,
                     "wa_message_id": res_envio.wa_message_id,
+                    "remetente": "ia",
+                    "texto": texto_resposta,
+                    "payload": {
+                        "provider": "uazapi",
+                        "res_envio": res_envio.model_dump(),
+                    },
+                    "enviado_em": datetime_from_timestamp(None),
                     "de_mim": True,
                     "telefone": telefone,
                     "conteudo": texto_resposta,
@@ -195,6 +246,7 @@ async def webhook_uazapi(
     headers_dict = dict(request.headers)
     captura_url = _url_para_captura(str(request.url))
     captura_headers = _headers_para_captura(headers_dict)
+    canal = await supabase_rest_service.buscar_canal_por_token(token) if token else None
 
     # 1. Captura bruta antes de qualquer processamento (AC 1)
     webhook_service.capturar_bruto(
@@ -203,11 +255,12 @@ async def webhook_uazapi(
         url=captura_url,
         headers=captura_headers,
         corpo=raw_body.decode("utf-8", errors="replace"),
-        tenant_id=None,
+        tenant_id=canal.get("tenant_id") if canal else None,
         hmac_ok=True,
     )
     await supabase_rest_service.registrar_webhook_captura(
         {
+            "tenant_id": canal.get("tenant_id") if canal else None,
             "provider": "uazapi",
             "metodo": request.method,
             "url": captura_url,

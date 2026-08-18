@@ -74,12 +74,79 @@ class SupabaseRestService:
         rows = res.json()
         return rows[0] if rows else None
 
+    async def identificar_lead(
+        self,
+        tenant_id: str,
+        telefone: str,
+        push_name: str | None,
+        origem: str = "whatsapp_organico",
+    ) -> dict[str, Any] | None:
+        res = await self._request(
+            "POST",
+            "rpc/identificar_lead",
+            json={
+                "p_tenant": tenant_id,
+                "p_telefone": telefone,
+                "p_push_name": push_name or "Cliente WhatsApp",
+                "p_origem": origem,
+            },
+        )
+        if not res or res.status_code >= 300:
+            logger.error("Falha ao identificar lead: %s", res.text[:300] if res else "sem resposta")
+            return None
+
+        data = res.json()
+        if isinstance(data, list):
+            return data[0] if data else None
+        return data if isinstance(data, dict) else None
+
+    async def upsert_conversa(
+        self,
+        tenant_id: str,
+        contato_id: str,
+        lead_id: str | None,
+        canal_id: str | None,
+    ) -> dict[str, Any] | None:
+        res = await self._request(
+            "POST",
+            "conversas?on_conflict=tenant_id,contato_id",
+            json={
+                "tenant_id": tenant_id,
+                "contato_id": contato_id,
+                "lead_id": lead_id,
+                "canal_id": canal_id,
+                "estado": "ia",
+                "ativada_em": datetime.now(timezone.utc).isoformat(),
+            },
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+        if not res or res.status_code >= 300:
+            logger.error("Falha ao criar/atualizar conversa: %s", res.text[:300] if res else "sem resposta")
+            return None
+
+        rows = res.json()
+        return rows[0] if rows else None
+
+    async def buscar_historico_mensagens(self, conversa_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        conversa_q = quote(conversa_id, safe="")
+        res = await self._request(
+            "GET",
+            (
+                "mensagens?select=id,remetente,texto,conteudo,de_mim,enviado_em,criado_em"
+                f"&conversa_id=eq.{conversa_q}&order=enviado_em.asc&limit={limit}"
+            ),
+        )
+        if not res or res.status_code >= 300:
+            logger.warning("Nao foi possivel buscar historico da conversa: %s", res.text[:300] if res else "sem resposta")
+            return []
+
+        return res.json()
+
     async def registrar_mensagem(self, payload: dict[str, Any]) -> None:
         res = await self._request(
             "POST",
-            "mensagens",
-            json=payload,
-            prefer="resolution=ignore-duplicates",
+            "rpc/registrar_mensagem_idempotente",
+            json={"p_payload": payload},
         )
         if not res or res.status_code >= 300:
             logger.warning("Nao foi possivel registrar mensagem no Supabase: %s", res.text[:300] if res else "sem resposta")

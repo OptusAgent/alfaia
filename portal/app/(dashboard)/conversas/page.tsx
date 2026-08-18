@@ -15,7 +15,7 @@ interface Conversa {
 }
 
 interface MensagemLocal {
-  id: number;
+  id: string | number;
   remetente: "cliente" | "atendente" | "ia";
   texto: string;
   enviado_em: string;
@@ -25,28 +25,19 @@ interface DbConversaItem {
   id: string;
   estado: "ia" | "humano" | "transbordo";
   criada_em: string;
+  ativada_em?: string | null;
   contatos?: { nome?: string; telefone?: string };
-  mensagens?: { texto: string; enviado_em: string }[];
+  leads?: { id?: string; status?: string; evento_tipo?: string | null; peca_interesse?: string | null };
+  mensagens?: {
+    id?: string | number;
+    remetente?: "lead" | "ia" | "atendente" | "sistema";
+    texto?: string | null;
+    conteudo?: string | null;
+    de_mim?: boolean | null;
+    enviado_em?: string | null;
+    criado_em?: string | null;
+  }[];
 }
-
-const FALLBACK_CONVERSAS: Conversa[] = [
-  {
-    id: "c1",
-    contato_nome: "Mariana Silva",
-    telefone: "+55 85 98811-2233",
-    estado: "transbordo",
-    ultima_mensagem: "Gostaria de falar com uma atendente para ajustar o vestido.",
-    atualizado_em: "14:22",
-  },
-  {
-    id: "c2",
-    contato_nome: "Carla Souza",
-    telefone: "+55 85 99922-3344",
-    estado: "ia",
-    ultima_mensagem: "Temos o Vestido Longo Champanhe disponível.",
-    atualizado_em: "14:15",
-  },
-];
 
 export default function ConversasPage() {
   const [conversas, setConversas] = useState<Conversa[]>([]);
@@ -64,40 +55,67 @@ export default function ConversasPage() {
             id,
             estado,
             criada_em,
+            ativada_em,
             contatos ( nome, telefone ),
-            mensagens ( texto, enviado_em )
+            leads ( id, status, evento_tipo, peca_interesse ),
+            mensagens ( id, remetente, texto, conteudo, de_mim, enviado_em, criado_em )
           `)
           .order("criada_em", { ascending: false });
 
         if (dbConversas && dbConversas.length > 0) {
+          const mensagensPorConversa: Record<string, MensagemLocal[]> = {};
           const mapped: Conversa[] = (dbConversas as unknown as DbConversaItem[]).map((item) => {
             const contato = item.contatos || {};
-            const msgs = item.mensagens || [];
+            const msgs = [...(item.mensagens || [])].sort((a, b) => {
+              const aDate = new Date(a.enviado_em || a.criado_em || item.criada_em).getTime();
+              const bDate = new Date(b.enviado_em || b.criado_em || item.criada_em).getTime();
+              return aDate - bDate;
+            });
             const ultima = msgs.at(-1);
+            mensagensPorConversa[item.id] = msgs.map((msg, index) => {
+              const enviadoEm = msg.enviado_em || msg.criado_em || item.criada_em;
+              const remetente = msg.remetente === "ia" || msg.de_mim
+                ? "ia"
+                : msg.remetente === "atendente"
+                  ? "atendente"
+                  : "cliente";
+              return {
+                id: msg.id || `${item.id}-${index}`,
+                remetente,
+                texto: msg.texto || msg.conteudo || "",
+                enviado_em: new Date(enviadoEm).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              };
+            }).filter((msg) => msg.texto);
+
             const hora = ultima
-              ? new Date(ultima.enviado_em).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-              : new Date(item.criada_em).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              ? new Date(ultima.enviado_em || ultima.criado_em || item.criada_em).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : new Date(item.ativada_em || item.criada_em).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
             return {
               id: item.id,
               contato_nome: contato.nome || "Cliente WhatsApp",
               telefone: contato.telefone || "WhatsApp",
               estado: item.estado || "ia",
-              ultima_mensagem: ultima?.texto || "Nova conversa iniciada",
+              ultima_mensagem: ultima?.texto || ultima?.conteudo || "Nova conversa iniciada",
               atualizado_em: hora,
             };
           });
 
           setConversas(mapped);
+          setMensagens(mensagensPorConversa);
           setSelecionadaId((current) => current || mapped[0]?.id || "");
           return;
         }
       } catch {
-        // Mantem fallback local quando o ambiente ainda nao tem Supabase populado.
+        setConversas([]);
+        setMensagens({});
+        setSelecionadaId("");
+        return;
       }
 
-      setConversas(FALLBACK_CONVERSAS);
-      setSelecionadaId((current) => current || FALLBACK_CONVERSAS[0].id);
+      setConversas([]);
+      setMensagens({});
+      setSelecionadaId("");
     }
 
     void fetchConversasEReais();
@@ -120,15 +138,7 @@ export default function ConversasPage() {
   const conversaSelecionada = conversas.find((c) => c.id === selecionadaId);
   const mensagensDaConversa = useMemo(() => {
     if (!conversaSelecionada) return [];
-    return [
-      {
-        id: 1,
-        remetente: "cliente" as const,
-        texto: conversaSelecionada.ultima_mensagem,
-        enviado_em: conversaSelecionada.atualizado_em,
-      },
-      ...(mensagens[conversaSelecionada.id] || []),
-    ];
+    return mensagens[conversaSelecionada.id] || [];
   }, [conversaSelecionada, mensagens]);
 
   const assumirConversa = async (id: string) => {
@@ -252,13 +262,13 @@ export default function ConversasPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 font-mono text-[8.4px] uppercase tracking-[0.13em]" style={{ color: mensagem.remetente === "atendente" ? "var(--gold)" : "var(--sage)" }}>
-                        {mensagem.remetente === "atendente" ? "Atendente" : "Cliente"}
+                        {mensagem.remetente === "atendente" ? "Atendente" : mensagem.remetente === "ia" ? "IA" : "Cliente"}
                       </div>
                       <div
                         className="rounded-[8px] px-3 py-[10px] text-[12.7px] leading-relaxed"
                         style={{
-                          background: mensagem.remetente === "atendente" ? "var(--gold-l)" : "var(--c2)",
-                          borderLeft: `2px solid ${mensagem.remetente === "atendente" ? "var(--gold)" : "var(--mut2)"}`,
+                          background: mensagem.remetente === "atendente" || mensagem.remetente === "ia" ? "var(--gold-l)" : "var(--c2)",
+                          borderLeft: `2px solid ${mensagem.remetente === "atendente" || mensagem.remetente === "ia" ? "var(--gold)" : "var(--mut2)"}`,
                         }}
                       >
                         {mensagem.texto}

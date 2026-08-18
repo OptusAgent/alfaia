@@ -276,7 +276,7 @@ class UazapiAdapter:
         msg_body = first_value(
             get_any(data, "mensagem", "body", "Body", "text", "Text", "conversation", "Conversation"),
             get_any(data_node, "mensagem", "body", "Body", "text", "Text", "conversation", "Conversation"),
-            get_any(message_node, "conversation", "Conversation"),
+            get_any(message_node, "conversation", "Conversation", "content", "Content", "text", "Text", "body", "Body"),
             nested(message_node, "extendedTextMessage", "text"),
             nested(message_node, "ExtendedTextMessage", "text"),
             nested(message_node, "imageMessage", "caption"),
@@ -291,6 +291,7 @@ class UazapiAdapter:
             get_any(data, "telefone", "phone", "Phone", "number", "Number", "from", "From", "remoteJid", "RemoteJid"),
             get_any(data_node, "telefone", "phone", "Phone", "number", "Number", "from", "From", "remoteJid", "RemoteJid", "chatId", "ChatID", "jid", "Jid"),
             get_any(key_node, "remoteJid", "RemoteJid", "participant", "Participant"),
+            get_any(message_node, "chatid", "chatId", "ChatID", "remoteJid", "RemoteJid", "from", "From", "sender", "Sender"),
             ""
         )
         if not raw_phone:
@@ -299,11 +300,15 @@ class UazapiAdapter:
         push_name = first_value(
             get_any(data, "push_name", "pushName", "PushName", "senderName", "SenderName"),
             get_any(data_node, "push_name", "pushName", "PushName", "senderName", "SenderName"),
+            get_any(message_node, "push_name", "pushName", "PushName", "senderName", "SenderName"),
+            nested(data, "chat", "name"),
+            nested(data, "Chat", "Name"),
             "Cliente",
         )
         wa_message_id = first_value(
-            get_any(data, "wa_message_id", "id", "ID"),
-            get_any(data_node, "id", "ID"),
+            get_any(data, "wa_message_id", "messageid", "messageId", "MessageID", "id", "ID"),
+            get_any(data_node, "messageid", "messageId", "MessageID", "id", "ID"),
+            get_any(message_node, "messageid", "messageId", "MessageID", "id", "ID"),
             get_any(key_node, "id", "ID"),
             "wamid.unknown",
         )

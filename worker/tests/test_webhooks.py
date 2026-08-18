@@ -11,6 +11,9 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def isola_dependencias_externas_webhook(monkeypatch):
     class FakeSupabase:
+        async def buscar_canal_por_token(self, token):
+            return None
+
         async def registrar_webhook_captura(self, payload):
             return None
 
@@ -61,6 +64,33 @@ def test_webhook_captura_bruta():
     assert ultimo_registro.provider == "uazapi"
     assert "user-agent" in ultimo_registro.headers
     assert "wamid.HBg22222" in ultimo_registro.corpo
+
+
+def test_webhook_captura_bruta_inclui_tenant_resolvido(monkeypatch):
+    calls = {"captura": None}
+
+    class FakeSupabase:
+        async def buscar_canal_por_token(self, token):
+            assert token == "token-canal-real"
+            return {"id": "canal-123", "tenant_id": "tenant-123"}
+
+        async def registrar_webhook_captura(self, payload):
+            calls["captura"] = payload
+
+    async def fake_processar_payload_background(**kwargs):
+        return None
+
+    monkeypatch.setattr("app.routers.webhooks.supabase_rest_service", FakeSupabase())
+    monkeypatch.setattr("app.routers.webhooks._processar_payload_background", fake_processar_payload_background)
+
+    response = client.post(
+        "/webhook/uazapi/token-canal-real",
+        json={"message": {"messageid": "wamid.capture.tenant", "content": "Oi"}},
+    )
+
+    assert response.status_code == 200
+    assert calls["captura"]["tenant_id"] == "tenant-123"
+    assert webhook_service.capturas_log[-1].tenant_id == "tenant-123"
 
 
 def test_webhook_captura_redige_token_e_headers_sensiveis():

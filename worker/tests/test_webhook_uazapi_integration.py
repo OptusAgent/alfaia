@@ -15,6 +15,9 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
         "adapter_init": None,
         "sent": None,
         "ia_config": None,
+        "identity": None,
+        "conversa": None,
+        "history": None,
     }
 
     class FakeSupabase:
@@ -38,6 +41,39 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
 
         async def registrar_mensagem(self, payload):
             calls["registered"].append(payload)
+
+        async def identificar_lead(self, tenant_id, telefone, push_name, origem="whatsapp_organico"):
+            calls["identity"] = {
+                "tenant_id": tenant_id,
+                "telefone": telefone,
+                "push_name": push_name,
+                "origem": origem,
+            }
+            return {
+                "contato_id": "contato-db-123",
+                "lead_id": "lead-db-123",
+                "entrada": "continuacao",
+            }
+
+        async def upsert_conversa(self, tenant_id, contato_id, lead_id, canal_id):
+            calls["conversa"] = {
+                "tenant_id": tenant_id,
+                "contato_id": contato_id,
+                "lead_id": lead_id,
+                "canal_id": canal_id,
+            }
+            return {"id": "conversa-db-123"}
+
+        async def buscar_historico_mensagens(self, conversa_id, limit=20):
+            calls["history"] = {"conversa_id": conversa_id, "limit": limit}
+            return [
+                {
+                    "id": "msg-hist-1",
+                    "remetente": "lead",
+                    "texto": "Oi",
+                    "enviado_em": "2026-08-17T12:00:00+00:00",
+                }
+            ]
 
     class FakeAdapter:
         def __init__(self, base_url, instance_name, token, **kwargs):
@@ -70,7 +106,10 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
         def processar_atendimento(self, **kwargs):
             calls["ia_config"] = kwargs["ia_config"]
             assert kwargs["tenant_id"] == "tenant-123"
-            assert kwargs["lead_dto"].contato_id == "contato_5585988124477"
+            assert kwargs["lead_dto"].contato_id == "contato-db-123"
+            assert kwargs["lead_dto"].id == "lead-db-123"
+            assert kwargs["tipo_entrada"] == "continuacao"
+            assert kwargs["historico_mensagens"][0]["texto"] == "Oi"
             return type("AIResult", (), {"texto_resposta": "Resposta via OpenRouter mockada."})()
 
     monkeypatch.setattr(webhooks, "supabase_rest_service", FakeSupabase())
@@ -101,12 +140,28 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
         "token": "token-real-instancia",
     }
     assert calls["ia_config"]["prompt_sistema"] == "Prompt do banco"
+    assert calls["identity"] == {
+        "tenant_id": "tenant-123",
+        "telefone": "5585988124477",
+        "push_name": "Mariana",
+        "origem": "whatsapp_organico",
+    }
+    assert calls["conversa"] == {
+        "tenant_id": "tenant-123",
+        "contato_id": "contato-db-123",
+        "lead_id": "lead-db-123",
+        "canal_id": "canal-123",
+    }
+    assert calls["history"] == {"conversa_id": "conversa-db-123", "limit": 20}
     assert calls["sent"] == {
         "to": "5585988124477",
         "text": "Resposta via OpenRouter mockada.",
     }
     assert calls["registered"][0]["canal_id"] == "canal-123"
+    assert calls["registered"][0]["conversa_id"] == "conversa-db-123"
+    assert calls["registered"][0]["lead_id"] == "lead-db-123"
     assert calls["registered"][1]["status"] == "enviado"
+    assert calls["registered"][1]["conversa_id"] == "conversa-db-123"
 
 
 def test_webhook_required_env_blocks_missing_secret(monkeypatch):

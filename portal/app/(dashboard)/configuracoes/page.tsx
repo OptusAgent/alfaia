@@ -40,6 +40,11 @@ export default function ConfiguracoesPage() {
   const [deletingChannel, setDeletingChannel] = useState<Canal | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resettingMemory, setResettingMemory] = useState(false);
+  const [resetResult, setResetResult] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   async function fetchCanais() {
     try {
@@ -140,6 +145,41 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  async function handleResetConversas(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setResettingMemory(true);
+    setResetResult(null);
+    setResetError(null);
+
+    try {
+      const res = await fetch("/api/conversas/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefone: resetPhone,
+          confirmacao: resetConfirm,
+          motivo: "Reset manual em Configuracoes",
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao resetar conversas.");
+      }
+
+      const removidos = data.removidos || {};
+      setResetResult(
+        `Removido: ${removidos.mensagens || 0} mensagens, ${removidos.conversas || 0} conversas, ${removidos.leads || 0} leads e ${removidos.contatos || 0} contatos.`
+      );
+      setResetConfirm("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao resetar conversas.";
+      setResetError(msg);
+    } finally {
+      setResettingMemory(false);
+    }
+  }
+
   function formatPhone(phone?: string | null) {
     if (!phone) return "Telefone não informado";
     return phone.replace(/^55(\d{2})(\d{5})(\d{4})$/, "+55 ($1) $2-$3");
@@ -209,6 +249,67 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
       </div>
+
+      {/* Test Tools */}
+      <form onSubmit={handleResetConversas} className="glass-card p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-xl space-y-1">
+            <h3
+              className="font-display text-lg font-bold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Resetar Conversas e Memória
+            </h3>
+            <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+              Remove conversas, mensagens, leads e contatos criados pelo atendimento
+              para reiniciar testes. As capturas brutas de webhook são preservadas.
+            </p>
+          </div>
+
+          <div className="grid w-full gap-3 md:grid-cols-[minmax(180px,1fr)_160px_auto] lg:w-auto">
+            <label className="block text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+              Telefone opcional
+              <input
+                value={resetPhone}
+                onChange={(event) => setResetPhone(event.target.value)}
+                placeholder="558599173321"
+                className="glass-input mt-1.5"
+              />
+            </label>
+            <label className="block text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+              Confirmação
+              <input
+                value={resetConfirm}
+                onChange={(event) => setResetConfirm(event.target.value)}
+                placeholder="RESETAR"
+                className="glass-input mt-1.5"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={resettingMemory}
+              className="glass-btn glass-btn-ghost self-end"
+              style={{ color: "var(--accent-coral)" }}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>{resettingMemory ? "Resetando..." : "Resetar"}</span>
+            </button>
+          </div>
+        </div>
+
+        {(resetResult || resetError) && (
+          <div
+            className="mt-4 rounded-lg px-4 py-3 text-sm"
+            style={{
+              background: resetError ? "var(--accent-coral-muted)" : "var(--accent-primary-muted)",
+              color: resetError ? "var(--accent-coral)" : "var(--accent-primary)",
+              border: resetError ? "1px solid rgba(232, 76, 94, 0.22)" : "1px solid rgba(0, 188, 163, 0.22)",
+            }}
+          >
+            {resetError || resetResult}
+          </div>
+        )}
+      </form>
 
       {/* Channels */}
       <div className="space-y-4">

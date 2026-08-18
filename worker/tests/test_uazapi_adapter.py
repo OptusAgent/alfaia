@@ -141,6 +141,32 @@ def test_uazapi_normalizar_webhook_payload_sender_text_fallback():
     assert normalized[0].mensagem == "Oi"
 
 
+def test_uazapi_normalizar_webhook_payload_real_message_chatid_content():
+    adapter = UazapiAdapter()
+    raw_payload = json.dumps({
+        "EventType": "messages",
+        "chat": {
+            "id": "558599173321@s.whatsapp.net",
+            "name": "Valmir Junior",
+        },
+        "message": {
+            "chatid": "558599173321@s.whatsapp.net",
+            "senderName": "Valmir Junior",
+            "content": "Tenho interesse em roupa para evento",
+            "id": "3EB0REAL",
+            "messageid": "wamid.real.uazapi.001",
+        },
+    }).encode("utf-8")
+
+    normalized = adapter.normalizar_webhook(raw_payload, {})
+
+    assert len(normalized) == 1
+    assert normalized[0].telefone == "558599173321"
+    assert normalized[0].push_name == "Valmir Junior"
+    assert normalized[0].mensagem == "Tenho interesse em roupa para evento"
+    assert normalized[0].wa_message_id == "wamid.real.uazapi.001"
+
+
 def test_uazapi_ignora_mensagem_enviada_pela_api_com_boolean_string():
     adapter = UazapiAdapter()
     raw_payload = json.dumps({
