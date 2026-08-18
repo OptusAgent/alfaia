@@ -137,6 +137,14 @@ async def test_supabase_rest_identifica_lead_conversa_historico_e_registra_mensa
             assert body["p_payload"]["conversa_id"] == "conversa-1"
             return httpx.Response(204)
 
+        if "/rest/v1/contatos" in url:
+            assert request.method == "PATCH"
+            assert "id=eq.contato-1" in url
+            assert request.headers["Prefer"] == "return=minimal"
+            body = json.loads(request.content.decode("utf-8"))
+            assert body == {"nome": "Mariana Silva"}
+            return httpx.Response(204)
+
         if "/rest/v1/mensagens?on_conflict=wa_message_id" in url:
             raise AssertionError("registrar_mensagem nao deve usar on_conflict REST contra indice parcial.")
 
@@ -154,8 +162,9 @@ async def test_supabase_rest_identifica_lead_conversa_historico_e_registra_mensa
             "wa_message_id": "wamid.real.uazapi.001",
             "texto": "Oi",
         })
+        await service.atualizar_contato_nome("contato-1", "  Mariana   Silva  ")
 
     assert identidade["contato_id"] == "contato-1"
     assert conversa["id"] == "conversa-1"
     assert historico[0]["texto"] == "Oi"
-    assert [item[0] for item in calls] == ["POST", "POST", "GET", "POST"]
+    assert [item[0] for item in calls] == ["POST", "POST", "GET", "POST", "PATCH"]

@@ -11,8 +11,23 @@ from app.services.openrouter_client import OpenRouterClient, openrouter_client
 
 logger = logging.getLogger("alfaia.ai_engine")
 
-NUMERIC_MENU_PATTERN = re.compile(r"(digite\s+\d+|opção\s+\d+|1\.\s+[\w\s]+\n2\.)", re.IGNORECASE)
+NUMERIC_MENU_PATTERN = re.compile(
+    r"(?im)^\s*(?:[-*•]\s+|\d+[\.)]\s+|[1-9]\ufe0f?\u20e3\s*)|"
+    r"(?:escolha\s+(?:uma\s+)?op[cç][aã]o|digite\s+\d+|responda\s+com\s+\d+)",
+    re.IGNORECASE,
+)
+MENU_INVITE_PATTERN = re.compile(r"(?:escolha\s+(?:uma\s+)?op[cç][aã]o|digite\s+\d+|responda\s+com\s+\d+)", re.IGNORECASE)
+MENU_LINE_PATTERN = re.compile(r"(?im)^\s*(?:[-*•]\s+|\d+[\.)]\s+|[1-9]\ufe0f?\u20e3\s*).+$")
 SENSITIVE_DATA_PATTERN = re.compile(r"\b(cpf|rg|comprovante|foto\s+do\s+documento|dados\s+bancários)\b", re.IGNORECASE)
+EXCESS_EMOJI_PATTERN = re.compile(r"[\U0001F300-\U0001FAFF]{2,}")
+EVENTO_PATTERN = re.compile(r"\b(casamento|formatura|anivers[aá]rio|baile|ensaio|evento corporativo|madrinha|noiva|padrinho|convidad[ao])\b", re.IGNORECASE)
+PECA_PATTERN = re.compile(
+    r"\b(terno(?:\s+(?!dia\b|data\b|no\b|para\b|em\b|com\b)[a-záéíóúãõç]+){0,4}|"
+    r"vestido(?:\s+(?!dia\b|data\b|no\b|para\b|em\b|com\b)[a-záéíóúãõç]+){0,4}|"
+    r"smoking|blazer|cal[çc]a|camisa)\b",
+    re.IGNORECASE,
+)
+DATA_PATTERN = re.compile(r"\b(?:dia\s+)?(\d{1,2}\s+de\s+[a-zç]+|\d{1,2}/\d{1,2}(?:/\d{2,4})?)\b", re.IGNORECASE)
 
 
 class AIResponseDTO(BaseModel):
@@ -37,13 +52,79 @@ class AIEngineService:
         """
         if NUMERIC_MENU_PATTERN.search(texto):
             logger.warning("Sanitização: Menu numérico detectado e removido da resposta da IA.")
+            tinha_convite_menu = bool(MENU_INVITE_PATTERN.search(texto))
+            texto = MENU_INVITE_PATTERN.sub("", texto)
+            texto = MENU_LINE_PATTERN.sub("", texto)
             texto = NUMERIC_MENU_PATTERN.sub("", texto).strip()
+            texto = re.sub(r"\n{3,}", "\n\n", texto)
+            texto = re.sub(r"\s+(?=\n)", "", texto)
+            texto = re.sub(r"^\s*[:;,-]+\s*", "", texto).strip()
+            texto = re.sub(r"\s*[:;,-]+\s*$", "", texto).strip()
+            if tinha_convite_menu and not texto:
+                texto = "Me diga como prefere seguir e eu continuo por aqui."
 
         if SENSITIVE_DATA_PATTERN.search(texto):
             logger.warning("Sanitização: Solicitação de documento sensível removida da resposta da IA.")
             texto = SENSITIVE_DATA_PATTERN.sub("[informação não necessária]", texto).strip()
 
+        if EXCESS_EMOJI_PATTERN.search(texto):
+            logger.warning("Sanitização: Emojis em excesso removidos da resposta da IA.")
+            texto = EXCESS_EMOJI_PATTERN.sub("", texto).strip()
+
         return texto
+
+    @staticmethod
+    def _extrair_fatos_conversa(textos: list[str]) -> dict[str, str]:
+        agregado = " ".join(textos)
+
+        evento_match = EVENTO_PATTERN.search(agregado)
+        peca_match = PECA_PATTERN.search(agregado)
+        data_match = DATA_PATTERN.search(agregado)
+        peca = peca_match.group(1).strip().lower() if peca_match else ""
+        peca = re.sub(r"\s+(?:dia|data|no|para|em)\s*$", "", peca).strip()
+
+        return {
+            "evento": evento_match.group(1).lower() if evento_match else "",
+            "peca": peca,
+            "data": data_match.group(1).strip().lower() if data_match else "",
+        }
+
+    @staticmethod
+    def _gerar_resposta_local_memoria(
+        contato_dto: ContatoDTO,
+        tipo_entrada: str,
+        mensagens_inbound: list[str],
+        historico_mensagens: list[dict[str, Any]] | None,
+    ) -> str:
+        historico_textos = [
+            str(msg.get("texto") or msg.get("conteudo") or "")
+            for msg in (historico_mensagens or [])
+            if msg.get("texto") or msg.get("conteudo")
+        ]
+        fatos = AIEngineService._extrair_fatos_conversa([*historico_textos, *mensagens_inbound])
+        nome = (contato_dto.nome or "").strip()
+        nome_ok = nome and nome.lower() not in ("cliente", "cliente whatsapp", "whatsapp")
+        saudacao = f"Oi, {nome.split()[0]}." if nome_ok and tipo_entrada != "continuacao" else ""
+
+        detalhes = []
+        if fatos["evento"]:
+            detalhes.append(f"para {fatos['evento']}")
+        if fatos["peca"]:
+            detalhes.append(f"com {fatos['peca']}")
+        if fatos["data"]:
+            detalhes.append(f"no dia {fatos['data']}")
+
+        if detalhes:
+            prefixo = f"{saudacao} " if saudacao else ""
+            return (
+                f"{prefixo}Anotei: prova {' '.join(detalhes)}. "
+                "Vou verificar o melhor caminho para seguirmos. Você já sabe o tamanho que costuma usar?"
+            ).strip()
+
+        if tipo_entrada == "continuacao" and historico_mensagens:
+            return "Certo. Me diga só o próximo detalhe para eu continuar daqui."
+
+        return f"{saudacao} Me conta para qual evento você precisa da peça?".strip()
 
     def processar_atendimento(
         self,
@@ -83,9 +164,7 @@ class AIEngineService:
             "conversa": {"estado": "ia"},
         }
 
-        mensagens_llm = [
-            {"role": "user", "content": texto_inbound},
-        ]
+        mensagens_llm = [{"role": "user", "content": texto_inbound}]
         if historico_mensagens:
             mensagens_llm = [
                 {
@@ -94,7 +173,9 @@ class AIEngineService:
                 }
                 for msg in historico_mensagens[-12:]
                 if msg.get("texto") or msg.get("conteudo")
-            ] + mensagens_llm
+            ]
+            if not mensagens_llm or mensagens_llm[-1]["content"].strip() != texto_inbound:
+                mensagens_llm = [*mensagens_llm, {"role": "user", "content": texto_inbound}]
 
         modelo = (
             (ia_config or {}).get("modelo")
@@ -140,7 +221,12 @@ class AIEngineService:
             transbordo_acionado = True
             texto_resposta = "Com certeza! Vou transferir sua conversa para um de nossos especialistas. Aguarde só um instante."
         else:
-            texto_resposta = f"Olá {contato_dto.nome}! Como posso ajudar você a escolher o modelo perfeito para o seu evento?"
+            texto_resposta = self._gerar_resposta_local_memoria(
+                contato_dto=contato_dto,
+                tipo_entrada=tipo_entrada,
+                mensagens_inbound=mensagens_inbound,
+                historico_mensagens=historico_mensagens,
+            )
 
         # 4. Pós-processamento de sanitização
         texto_resposta = self.sanitizar_resposta_ia(texto_resposta)

@@ -18,6 +18,7 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
         "identity": None,
         "conversa": None,
         "history": None,
+        "nome_atualizado": None,
     }
 
     class FakeSupabase:
@@ -75,6 +76,9 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
                 }
             ]
 
+        async def atualizar_contato_nome(self, contato_id, nome):
+            calls["nome_atualizado"] = {"contato_id": contato_id, "nome": nome}
+
     class FakeAdapter:
         def __init__(self, base_url, instance_name, token, **kwargs):
             calls["adapter_init"] = {
@@ -90,8 +94,8 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
                     canal_id="fallback-canal",
                     provider="uazapi",
                     telefone="5585988124477",
-                    push_name="Mariana",
-                    mensagem="Oi, quero agendar uma prova",
+                    push_name="Cliente",
+                    mensagem="Oi, me chamo Mariana Silva e quero agendar uma prova",
                     wa_message_id="wamid.qa.webhook",
                     timestamp=1786900000,
                     data_atual="2026-08-17",
@@ -121,7 +125,7 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
             "wa_message_id": "wamid.qa.webhook",
             "event": "message.received",
             "telefone": "85988124477",
-            "mensagem": "Oi, quero agendar uma prova",
+            "mensagem": "Oi, me chamo Mariana Silva e quero agendar uma prova",
         }
     ).encode("utf-8")
 
@@ -143,9 +147,10 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
     assert calls["identity"] == {
         "tenant_id": "tenant-123",
         "telefone": "5585988124477",
-        "push_name": "Mariana",
+        "push_name": "Mariana Silva",
         "origem": "whatsapp_organico",
     }
+    assert calls["nome_atualizado"] == {"contato_id": "contato-db-123", "nome": "Mariana Silva"}
     assert calls["conversa"] == {
         "tenant_id": "tenant-123",
         "contato_id": "contato-db-123",

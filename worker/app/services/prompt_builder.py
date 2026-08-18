@@ -11,6 +11,9 @@ REGRAS_INVIOLAVEIS_SISTEMA = """
    - Exemplo Incorreto: "Olá! Para prosseguir, confirme seu nome completo, tipo de evento, data do evento e peça de interesse."
 3. RESPEITO À PERSONA: Mantenha sempre um tom humano, cordial, empático e alinhado com a persona do estabelecimento comercial.
 4. OBJETIVIDADE: Responda de forma direta e pergunte apenas o necessário para avançar no atendimento ou fechamento.
+5. NÃO USE MENUS: não responda com listas numeradas, bullets, "digite uma opção" ou checklists. Converse como uma atendente humana.
+6. UMA COISA POR VEZ: quando precisar de informação, peça apenas um dado por mensagem.
+7. CONTINUAÇÃO: se houver histórico recente, não diga "Olá, tudo bem?", não se apresente de novo e não pergunte novamente evento, peça ou data já informados.
 """
 
 
@@ -25,12 +28,16 @@ class PromptBuilderService:
         contexto: dict[str, Any],
         prompt_base_persona: str | None = None,
     ) -> str:
-        persona = prompt_base_persona or "Você é a assistente de atendimento especialista do ALFAIA."
+        persona = prompt_base_persona or (
+            "Você atende pelo ALFAIA no WhatsApp. Fale como uma atendente humana: simples, educada, direta, "
+            "sem excesso de elogios, sem linguagem de IA e sem frases pomposas."
+        )
         tipo_entrada = contexto.get("tipo_entrada", "primeiro_contato")
         contato = contexto.get("contato", {})
         lead_atual = contexto.get("lead_atual", {})
         lead_anterior = contexto.get("lead_anterior")
         resumo_anterior = contexto.get("resumo_conversa_anterior")
+        historico_recente = contexto.get("historico_recente") or []
 
         # Instruções condicionais baseadas no tipo de entrada (§9.6)
         instrucao_entrada = ""
@@ -55,13 +62,23 @@ DIRETRIZ: Saúde o cliente e confira amigavelmente se ele deseja dar continuidad
         elif tipo_entrada == "continuacao":
             instrucao_entrada = """
 === INSTRUÇÃO DE CONTINUAÇÃO ===
-Atendimento em andamento normal. O interesse atual do lead já está registrado no contexto. Não repergunte preferências já conhecidas.
+Atendimento em andamento normal. O interesse atual do lead já está registrado no contexto e/ou no histórico.
+DIRETRIZ: Continue do ponto em que a conversa parou. Não cumprimente de novo, não se reapresente e não repergunte preferências já conhecidas.
 """
         else:  # primeiro_contato
             instrucao_entrada = """
 === INSTRUÇÃO DE PRIMEIRO CONTATO ===
 Primeira vez que este cliente entra em contato. Acolha com cordialidade e descubra o evento e peça de interesse.
 """
+
+        linhas_historico = []
+        for msg in historico_recente[-8:]:
+            texto = str(msg.get("texto") or msg.get("conteudo") or "").strip()
+            if not texto:
+                continue
+            remetente = "cliente" if msg.get("remetente") in ("lead", "cliente") else "atendimento"
+            linhas_historico.append(f"- {remetente}: {texto[:240]}")
+        historico_bloco = "\n".join(linhas_historico) or "Sem histórico recente."
 
         prompt_final = f"""{persona}
 
@@ -74,6 +91,12 @@ Nome: {contato.get('nome', 'Cliente')}
 Telefone: {contato.get('telefone')}
 Tags/Segmentação: {contato.get('tags', {})}
 Status do Lead Atual: {lead_atual.get('status')}
+Evento conhecido: {lead_atual.get('evento_tipo') or 'ainda não registrado'}
+Data conhecida: {lead_atual.get('evento_data') or 'ainda não registrada'}
+Peça conhecida: {lead_atual.get('peca_interesse') or 'ainda não registrada'}
+
+=== HISTÓRICO RECENTE REAL ===
+{historico_bloco}
 """
 
         logger.info(f"Prompt do sistema gerado [tipo_entrada={tipo_entrada}]")

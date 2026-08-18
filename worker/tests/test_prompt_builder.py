@@ -49,3 +49,24 @@ def test_prompt_regressao_exemplo_prd():
     """Testa se os exemplos literais de §9.6 do PRD estão contidos nas regras de regressão do prompt (AC 2)."""
     assert "Oi Marcela! Você tinha visto o Longo Champanhe pro casamento de setembro. Ainda é isso ou mudou alguma coisa?" in REGRAS_INVIOLAVEIS_SISTEMA
     assert "Olá! Para prosseguir, confirme seu nome completo, tipo de evento, data do evento e peça de interesse." in REGRAS_INVIOLAVEIS_SISTEMA
+
+
+def test_prompt_continuacao_proibe_reapresentacao_menu_e_inclui_historico():
+    contexto = {
+        "tipo_entrada": "continuacao",
+        "contato": {"nome": "Mariana", "telefone": "5585988124477"},
+        "lead_atual": {"status": "qualificando", "evento_tipo": "casamento", "peca_interesse": "terno azul marinho"},
+        "historico_recente": [
+            {"remetente": "lead", "texto": "Quero agendar uma prova"},
+            {"remetente": "lead", "texto": "É um casamento e quero um terno azul marinho completo"},
+        ],
+    }
+
+    prompt = PromptBuilderService.gerar_prompt_sistema(contexto)
+
+    assert "não diga \"Olá, tudo bem?\"" in prompt
+    assert "não se reapresente" in prompt.lower()
+    assert "NÃO USE MENUS" in prompt
+    assert "Uma coisa por vez" in prompt or "UMA COISA POR VEZ" in prompt
+    assert "cliente: Quero agendar uma prova" in prompt
+    assert "terno azul marinho" in prompt

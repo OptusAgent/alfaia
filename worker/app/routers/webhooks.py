@@ -47,6 +47,49 @@ def datetime_from_timestamp(timestamp: int | None) -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _nome_generico(nome: str | None) -> bool:
+    normalizado = " ".join(str(nome or "").strip().lower().split())
+    return normalizado in ("", "cliente", "cliente whatsapp", "whatsapp", "sem nome")
+
+
+def _extrair_nome_explicito(mensagem: str) -> str | None:
+    texto = " ".join(str(mensagem or "").strip().split())
+    match = re.search(
+        r"\b(?:meu nome (?:é|e)|me chamo|sou)\s+([A-ZÀ-Ýa-zà-ÿ][A-ZÀ-Ýa-zà-ÿ'´`~-]*(?:\s+[A-ZÀ-Ýa-zà-ÿ][A-ZÀ-Ýa-zà-ÿ'´`~-]*){0,3})",
+        texto,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    nome = re.split(r"[,.;!?]|\s+(?:e|quero|preciso|gostaria|vou)\b", match.group(1).strip(), maxsplit=1, flags=re.IGNORECASE)[0]
+    nome = " ".join(nome.split())
+    primeiro = nome.split()[0].lower() if nome else ""
+    termos_nao_nome = {
+        "padrinho",
+        "madrinha",
+        "noiva",
+        "noivo",
+        "formando",
+        "formanda",
+        "convidado",
+        "convidada",
+        "cliente",
+    }
+    if len(nome) < 2 or _nome_generico(nome) or primeiro in termos_nao_nome:
+        return None
+    return nome
+
+
+def _nome_preferencial(push_name: str | None, mensagem: str) -> str:
+    nome_explicito = _extrair_nome_explicito(mensagem)
+    if nome_explicito:
+        return nome_explicito
+    if not _nome_generico(push_name):
+        return str(push_name).strip()
+    return "Cliente WhatsApp"
+
+
 async def _processar_payload_background(
     provider: str,
     raw_body: bytes,
@@ -112,7 +155,7 @@ async def _processar_payload_background(
 
         telefone = payload.telefone
         mensagem_cliente = payload.mensagem
-        push_name = payload.push_name or "Cliente WhatsApp"
+        push_name = _nome_preferencial(payload.push_name, mensagem_cliente)
 
         if not telefone or not mensagem_cliente:
             logger.info(
@@ -134,6 +177,8 @@ async def _processar_payload_background(
         contato_id = identidade.get("contato_id") if identidade else None
         lead_id = identidade.get("lead_id") if identidade else None
         tipo_entrada = identidade.get("entrada") if identidade else "inbound_mensagem"
+        if contato_id and not _nome_generico(push_name):
+            await supabase_rest_service.atualizar_contato_nome(contato_id, push_name)
 
         conversa = None
         if contato_id:

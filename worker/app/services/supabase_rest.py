@@ -142,6 +142,20 @@ class SupabaseRestService:
 
         return res.json()
 
+    async def atualizar_contato_nome(self, contato_id: str, nome: str) -> None:
+        nome_limpo = " ".join(str(nome or "").split())
+        if not contato_id or not nome_limpo:
+            return
+
+        res = await self._request(
+            "PATCH",
+            f"contatos?id=eq.{quote(contato_id, safe='')}",
+            json={"nome": nome_limpo},
+            prefer="return=minimal",
+        )
+        if not res or res.status_code >= 300:
+            logger.warning("Nao foi possivel atualizar nome do contato: %s", res.text[:300] if res else "sem resposta")
+
     async def registrar_mensagem(self, payload: dict[str, Any]) -> None:
         res = await self._request(
             "POST",

@@ -1,0 +1,47 @@
+schema: 1
+story: "4.7"
+story_title: "Persona humana, memória de contexto e respostas sem menus"
+gate: PASS
+status_reason: "Os dois MEDIUM anteriores foram corrigidos e revalidados: menus residuais não permanecem como opções soltas e o fallback local não captura 'dia' como parte da peça."
+reviewer: "Quinn (Test Architect)"
+reviewed_revision: "f6ee816+wt.story-4.7-post-medium-fixes"
+updated: "2026-08-18T00:35:59-03:00"
+waiver:
+  active: false
+top_issues: []
+evidence:
+  tests_reviewed:
+    count: 5
+    commands:
+      - "pytest worker/tests/test_ai_engine.py -q"
+      - "pytest worker/tests/test_ai_engine.py worker/tests/test_prompt_builder.py worker/tests/test_supabase_rest.py worker/tests/test_webhook_uazapi_integration.py -q"
+      - "pytest worker/tests/test_context_builder.py worker/tests/test_ia_config.py worker/tests/test_uazapi_adapter.py -q"
+      - "npm --prefix portal run lint"
+      - "Probe QA manual do cenário multi-turn e sanitização de menu/keycap após correção dos MEDIUM."
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+  limitations:
+    - "CodeRabbit CLI indisponível localmente."
+    - "Sem teste com LLM real/OpenRouter; validação usa fake client e fallback local."
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Persistência de nome fica no worker server-side; sem exposição de service key ao client."
+  performance:
+    status: PASS
+    notes: "Histórico limitado a 12 mensagens para LLM e 8 linhas no prompt."
+  reliability:
+    status: PASS
+    notes: "Fallback local revalidado no cenário da story sem falso positivo de marcador de data."
+  maintainability:
+    status: PASS
+    notes: "Regexes críticas possuem testes regressivos para menus residuais e fronteiras de peça/data."
+quality_score: 95
+expires: "2026-09-01T00:00:00-03:00"
+recommendations:
+  immediate: []
+  future:
+    - action: "Adicionar avaliação de resposta real OpenRouter em ambiente controlado para tom/persona quando houver crédito e credenciais."
+      refs:
+        - "worker/app/services/openrouter_client.py"
