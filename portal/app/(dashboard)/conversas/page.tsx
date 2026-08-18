@@ -23,6 +23,7 @@ interface MensagemLocal {
 
 interface DbConversaItem {
   id: string;
+  tenant_id: string;
   estado: "ia" | "humano" | "transbordo";
   criada_em: string;
   ativada_em?: string | null;
@@ -44,15 +45,31 @@ export default function ConversasPage() {
   const [selecionadaId, setSelecionadaId] = useState("");
   const [novoTexto, setNovoTexto] = useState("");
   const [mensagens, setMensagens] = useState<Record<string, MensagemLocal[]>>({});
+  const [tenantId, setTenantId] = useState("");
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    async function fetchConversasEReais() {
+    async function fetchTenantAtivo() {
+      const res = await fetch("/api/tenant/active", { cache: "no-store" });
+      if (!res.ok) return "";
+      const data = await res.json();
+      return String(data.tenant_id || "");
+    }
+
+    async function fetchConversasEReais(activeTenantId: string) {
+      if (!activeTenantId) {
+        setConversas([]);
+        setMensagens({});
+        setSelecionadaId("");
+        return;
+      }
+
       try {
         const { data: dbConversas } = await supabase
           .from("conversas")
           .select(`
             id,
+            tenant_id,
             estado,
             criada_em,
             ativada_em,
@@ -60,6 +77,7 @@ export default function ConversasPage() {
             leads ( id, status, evento_tipo, peca_interesse ),
             mensagens ( id, remetente, texto, conteudo, de_mim, enviado_em, criado_em )
           `)
+          .eq("tenant_id", activeTenantId)
           .order("criada_em", { ascending: false });
 
         if (dbConversas && dbConversas.length > 0) {
@@ -118,20 +136,29 @@ export default function ConversasPage() {
       setSelecionadaId("");
     }
 
-    void fetchConversasEReais();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let mounted = true;
 
-    const channel = supabase
-      .channel("realtime-conversas-live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "mensagens" }, () => {
-        void fetchConversasEReais();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversas" }, () => {
-        void fetchConversasEReais();
-      })
-      .subscribe();
+    void fetchTenantAtivo().then((activeTenantId) => {
+      if (!mounted) return;
+      setTenantId(activeTenantId);
+      void fetchConversasEReais(activeTenantId);
+
+      if (!activeTenantId) return;
+      channel = supabase
+        .channel(`realtime-conversas-live-${activeTenantId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "mensagens", filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          void fetchConversasEReais(activeTenantId);
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "conversas", filter: `tenant_id=eq.${activeTenantId}` }, () => {
+          void fetchConversasEReais(activeTenantId);
+        })
+        .subscribe();
+    });
 
     return () => {
-      void supabase.removeChannel(channel);
+      mounted = false;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [supabase]);
 
@@ -144,7 +171,7 @@ export default function ConversasPage() {
   const assumirConversa = async (id: string) => {
     setConversas((prev) => prev.map((c) => (c.id === id ? { ...c, estado: "humano" } : c)));
     try {
-      await supabase.from("conversas").update({ estado: "humano" }).eq("id", id);
+      await supabase.from("conversas").update({ estado: "humano" }).eq("id", id).eq("tenant_id", tenantId);
     } catch {
       //
     }
@@ -153,7 +180,7 @@ export default function ConversasPage() {
   const devolverParaIA = async (id: string) => {
     setConversas((prev) => prev.map((c) => (c.id === id ? { ...c, estado: "ia" } : c)));
     try {
-      await supabase.from("conversas").update({ estado: "ia" }).eq("id", id);
+      await supabase.from("conversas").update({ estado: "ia" }).eq("id", id).eq("tenant_id", tenantId);
     } catch {
       //
     }

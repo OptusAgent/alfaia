@@ -65,7 +65,8 @@ begin
     coalesce(nullif(p_payload ->> 'status', ''), 'recebido')
   )
   on conflict (wa_message_id) where wa_message_id is not null do nothing;
-end $$;
+end;
+$$;
 
 create or replace function backfill_conversas_memoria()
 returns table (mensagens_atualizadas int, capturas_importadas int)
@@ -130,106 +131,105 @@ begin
   loop
     begin
       v_payload := r.corpo::jsonb;
-      v_telefone := regexp_replace(coalesce(v_payload #>> '{message,chatid}', ''), '\D', '', 'g');
-      v_texto := coalesce(v_payload #>> '{message,text}', v_payload #>> '{message,content}');
-      v_wamid := coalesce(v_payload #>> '{message,messageid}', v_payload #>> '{message,id}');
-      v_nome := coalesce(v_payload #>> '{message,senderName}', v_payload #>> '{chat,name}', 'Cliente WhatsApp');
-      v_instancia := coalesce(
-        v_payload ->> 'InstanceName',
-        v_payload ->> 'instanceName',
-        v_payload ->> 'instance',
-        v_payload #>> '{instance,name}',
-        v_payload #>> '{Instance,Name}'
-      );
-      v_base_url := coalesce(v_payload ->> 'BaseUrl', v_payload ->> 'baseUrl');
-      v_tenant := r.tenant_id;
-      v_canal := null;
-
-      if v_tenant is not null then
-        select id
-          into v_canal
-        from canais
-        where tenant_id = v_tenant
-          and provider = 'uazapi'
-          and excluido_em is null
-        order by ativo desc, criado_em desc
-        limit 1;
-      end if;
-
-      if v_tenant is null then
-        select id, tenant_id
-          into v_canal, v_tenant
-        from canais
-        where provider = 'uazapi'
-          and excluido_em is null
-          and (
-            (v_instancia is not null and uazapi_instancia = v_instancia)
-            or (v_base_url is not null and rtrim(coalesce(uazapi_base_url, ''), '/') = rtrim(v_base_url, '/'))
-          )
-        order by ativo desc, criado_em desc
-        limit 1;
-      end if;
-
-      if v_tenant is null then
-        select count(*), max(id), max(tenant_id)
-          into v_candidatos, v_canal, v_tenant
-        from canais
-        where provider = 'uazapi'
-          and ativo is true
-          and excluido_em is null;
-
-        if v_candidatos <> 1 then
-          raise warning 'backfill_conversas_memoria: captura % sem tenant resolvivel; candidatos=%', r.id, v_candidatos;
-          continue;
-        end if;
-      end if;
-
-      if v_telefone is null or length(v_telefone) < 10 or v_texto is null or v_texto = '' then
-        continue;
-      end if;
-      if length(v_telefone) in (10, 11) and left(v_telefone, 2) <> '55' then
-        v_telefone := '55' || v_telefone;
-      end if;
-
-      select contato_id, lead_id, entrada
-        into v_contato, v_lead, v_entrada
-      from identificar_lead(v_tenant, v_telefone, v_nome, 'whatsapp_organico');
-
-      insert into conversas (tenant_id, contato_id, lead_id, canal_id, estado, ativada_em)
-      values (v_tenant, v_contato, v_lead, v_canal, 'ia', now())
-      on conflict (tenant_id, contato_id) do update
-        set lead_id = coalesce(conversas.lead_id, excluded.lead_id),
-            canal_id = coalesce(excluded.canal_id, conversas.canal_id),
-            ativada_em = now()
-      returning id into v_conversa;
-
-      perform registrar_mensagem_idempotente(jsonb_build_object(
-        'tenant_id', v_tenant,
-        'canal_id', v_canal,
-        'conversa_id', v_conversa,
-        'lead_id', v_lead,
-        'wa_message_id', coalesce(v_wamid, 'captura-' || r.id::text),
-        'remetente', 'lead',
-        'texto', v_texto,
-        'payload', v_payload,
-        'enviado_em', r.criado_em,
-        'telefone', v_telefone,
-        'conteudo', v_texto,
-        'de_mim', false,
-        'status', 'recebido'
-      ));
-
-      capturas_importadas := capturas_importadas + 1;
     exception when invalid_text_representation then
       raise warning 'backfill_conversas_memoria: captura % com JSON invalido ou cast invalido', r.id;
       continue;
-    exception when others then
-      raise warning 'backfill_conversas_memoria: captura % falhou: %', r.id, sqlerrm;
-      continue;
     end;
+
+    v_telefone := regexp_replace(coalesce(v_payload #>> '{message,chatid}', ''), '\D', '', 'g');
+    v_texto := coalesce(v_payload #>> '{message,text}', v_payload #>> '{message,content}');
+    v_wamid := coalesce(v_payload #>> '{message,messageid}', v_payload #>> '{message,id}');
+    v_nome := coalesce(v_payload #>> '{message,senderName}', v_payload #>> '{chat,name}', 'Cliente WhatsApp');
+    v_instancia := coalesce(
+      v_payload ->> 'InstanceName',
+      v_payload ->> 'instanceName',
+      v_payload ->> 'instance',
+      v_payload #>> '{instance,name}',
+      v_payload #>> '{Instance,Name}'
+    );
+    v_base_url := coalesce(v_payload ->> 'BaseUrl', v_payload ->> 'baseUrl');
+    v_tenant := r.tenant_id;
+    v_canal := null;
+
+    if v_tenant is not null then
+      select id
+        into v_canal
+      from canais
+      where tenant_id = v_tenant
+        and provider = 'uazapi'
+        and excluido_em is null
+      order by ativo desc, criado_em desc
+      limit 1;
+    end if;
+
+    if v_tenant is null then
+      select id, tenant_id
+        into v_canal, v_tenant
+      from canais
+      where provider = 'uazapi'
+        and excluido_em is null
+        and (
+          (v_instancia is not null and uazapi_instancia = v_instancia)
+          or (v_base_url is not null and rtrim(coalesce(uazapi_base_url, ''), '/') = rtrim(v_base_url, '/'))
+        )
+      order by ativo desc, criado_em desc
+      limit 1;
+    end if;
+
+    if v_tenant is null then
+      select count(*), max(id), max(tenant_id)
+        into v_candidatos, v_canal, v_tenant
+      from canais
+      where provider = 'uazapi'
+        and ativo is true
+        and excluido_em is null;
+
+      if v_candidatos <> 1 then
+        raise warning 'backfill_conversas_memoria: captura % sem tenant resolvivel; candidatos=%', r.id, v_candidatos;
+        continue;
+      end if;
+    end if;
+
+    if v_telefone is null or length(v_telefone) < 10 or v_texto is null or v_texto = '' then
+      continue;
+    end if;
+    if length(v_telefone) in (10, 11) and left(v_telefone, 2) <> '55' then
+      v_telefone := '55' || v_telefone;
+    end if;
+
+    select contato_id, lead_id, entrada
+      into v_contato, v_lead, v_entrada
+    from identificar_lead(v_tenant, v_telefone, v_nome, 'whatsapp_organico');
+
+    insert into conversas (tenant_id, contato_id, lead_id, canal_id, estado, ativada_em)
+    values (v_tenant, v_contato, v_lead, v_canal, 'ia', now())
+    on conflict (tenant_id, contato_id) do update
+      set lead_id = coalesce(conversas.lead_id, excluded.lead_id),
+          canal_id = coalesce(excluded.canal_id, conversas.canal_id),
+          ativada_em = now()
+    returning id into v_conversa;
+
+    perform registrar_mensagem_idempotente(jsonb_build_object(
+      'tenant_id', v_tenant,
+      'canal_id', v_canal,
+      'conversa_id', v_conversa,
+      'lead_id', v_lead,
+      'wa_message_id', coalesce(v_wamid, 'captura-' || r.id::text),
+      'remetente', 'lead',
+      'texto', v_texto,
+      'payload', v_payload,
+      'enviado_em', r.criado_em,
+      'telefone', v_telefone,
+      'conteudo', v_texto,
+      'de_mim', false,
+      'status', 'recebido'
+    ));
+
+    capturas_importadas := capturas_importadas + 1;
   end loop;
 
   return next;
-end $$;
+end;
+$$;
 
 select * from backfill_conversas_memoria();
