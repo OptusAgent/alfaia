@@ -1,0 +1,159 @@
+{
+  "_aviso": "DADO SINTÉTICO — gerado para testar a wl-fake-api (mock da API da WebLocação). Não é catálogo real de nenhuma locadora. Ver wl-fake-api/README.md.",
+  "gerado_em": "2026-08-19",
+  "produtos": [
+    {
+      "id": "wl_p101",
+      "codigo": "V-101",
+      "nome": "Vestido Aurora Tomara-que-Caia",
+      "categoria": "casamento/noiva",
+      "cor": "Off-White",
+      "estilo": "Princesa (A-line)",
+      "tecido": "Cetim",
+      "valor_locacao": 890.0,
+      "arquivo_origem": "noiva001.jpg",
+      "tamanhos": [
+        {"tamanho": "36", "estoque": 1},
+        {"tamanho": "38", "estoque": 2},
+        {"tamanho": "40", "estoque": 2},
+        {"tamanho": "42", "estoque": 1},
+        {"tamanho": "44", "estoque": 0}
+      ]
+    },
+    {
+      "id": "wl_p102",
+      "codigo": "V-102",
+      "nome": "Vestido Elise Sereia Ombro a Ombro",
+      "categoria": "casamento/noiva",
+      "cor": "Marfim",
+      "estilo": "Sereia",
+      "tecido": "Cetim acetinado",
+      "valor_locacao": 1050.0,
+      "arquivo_origem": "noiva002.jpg",
+      "tamanhos": [
+        {"tamanho": "36", "estoque": 1},
+        {"tamanho": "38", "estoque": 1},
+        {"tamanho": "40", "estoque": 1},
+        {"tamanho": "42", "estoque": 1}
+      ]
+    },
+    {
+      "id": "wl_p201",
+      "codigo": "T-201",
+      "nome": "Terno Marinho Slim 3 Peças",
+      "categoria": "casamento/traje-masculino",
+      "cor": "Azul Marinho",
+      "estilo": "Slim, 3 peças",
+      "tecido": "Tricoline (poliéster/viscose)",
+      "valor_locacao": 420.0,
+      "arquivo_origem": "0002.jpeg",
+      "tamanhos": [
+        {"tamanho": "46", "estoque": 2},
+        {"tamanho": "48", "estoque": 3},
+        {"tamanho": "50", "estoque": 2},
+        {"tamanho": "52", "estoque": 1}
+      ]
+    },
+    {
+      "id": "wl_p202",
+      "codigo": "T-202",
+      "nome": "Terno Areia Rústico 3 Peças",
+      "categoria": "casamento/traje-masculino",
+      "cor": "Bege Areia",
+      "estilo": "Slim, 3 peças",
+      "tecido": "Linho",
+      "valor_locacao": 450.0,
+      "arquivo_origem": "TERNOMASCULINO001.jpg",
+      "tamanhos": [
+        {"tamanho": "46", "estoque": 1},
+        {"tamanho": "48", "estoque": 2},
+        {"tamanho": "50", "estoque": 0},
+        {"tamanho": "52", "estoque": 1}
+      ]
+    },
+    {
+      "id": "wl_p203",
+      "codigo": "T-203",
+      "nome": "Terno Linho Praia Champanhe",
+      "categoria": "casamento/traje-masculino",
+      "cor": "Bege Claro",
+      "estilo": "Slim, 3 peças",
+      "tecido": "Linho leve",
+      "valor_locacao": 460.0,
+      "arquivo_origem": "TERNOMASCULINO002.jpg",
+      "tamanhos": [
+        {"tamanho": "46", "estoque": 2},
+        {"tamanho": "48", "estoque": 2},
+        {"tamanho": "50", "estoque": 2}
+      ]
+    },
+    {
+      "id": "wl_p204",
+      "codigo": "T-204",
+      "nome": "Terno Marinho Clássico Social",
+      "categoria": "casamento/traje-masculino",
+      "cor": "Azul Marinho",
+      "estilo": "Clássico, 3 peças",
+      "tecido": "Lã fria (worsted)",
+      "valor_locacao": 480.0,
+      "arquivo_origem": "TERNOMASCULINO003.jpg",
+      "tamanhos": [
+        {"tamanho": "46", "estoque": 1},
+        {"tamanho": "48", "estoque": 1},
+        {"tamanho": "50", "estoque": 1},
+        {"tamanho": "52", "estoque": 2}
+      ]
+    },
+    {
+      "id": "wl_p301",
+      "codigo": "F-301",
+      "nome": "Vestido Noite Preto Plissado",
+      "categoria": "festa/madrinha",
+      "cor": "Preto",
+      "estilo": "Sereia, gola halter",
+      "tecido": "Crepe plissado",
+      "valor_locacao": 380.0,
+      "arquivo_origem": "VESTIDO01.jpg",
+      "tamanhos": [
+        {"tamanho": "36", "estoque": 2},
+        {"tamanho": "38", "estoque": 3},
+        {"tamanho": "40", "estoque": 1},
+        {"tamanho": "42", "estoque": 0}
+      ]
+    },
+    {
+      "id": "wl_p302",
+      "codigo": "F-302",
+      "nome": "Vestido Festa Laranja Costas Abertas",
+      "categoria": "festa/madrinha",
+      "cor": "Laranja",
+      "estilo": "Fluido, gola halter",
+      "tecido": "Chiffon",
+      "valor_locacao": 350.0,
+      "arquivo_origem": "VESTIDO02.jpg",
+      "tamanhos": [
+        {"tamanho": "36", "estoque": 1},
+        {"tamanho": "38", "estoque": 2},
+        {"tamanho": "40", "estoque": 2},
+        {"tamanho": "42", "estoque": 1}
+      ]
+    },
+    {
+      "id": "wl_p303",
+      "codigo": "F-303",
+      "nome": "Vestido Esmeralda Um Ombro Só",
+      "categoria": "festa/madrinha",
+      "cor": "Verde Esmeralda",
+      "estilo": "Assimétrico, um ombro só",
+      "tecido": "Jersey",
+      "valor_locacao": 360.0,
+      "arquivo_origem": "VESTIDO03.jpg",
+      "tamanhos": [
+        {"tamanho": "40", "estoque": 2},
+        {"tamanho": "42", "estoque": 2},
+        {"tamanho": "44", "estoque": 1},
+        {"tamanho": "46", "estoque": 1}
+      ]
+    }
+  ]
+}

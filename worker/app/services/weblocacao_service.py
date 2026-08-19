@@ -167,10 +167,98 @@ class WebLocacaoService:
             self.registrar_chamada(tenant_id, "GET", "/produtos", 200, latencia)
             return res
 
-        # Invocação de cliente real com timeout 8s e retries 5xx (I2, I4)
-        return self._invocar_cliente_real_produtos(tenant_id, params, t0)
+        brutos = self._chamar_api_real(tenant_id, "GET", "/produtos", t0, params=params)
+        # Tradução da camada anticorrupção (I7, AC 2)
+        return [self._traduzir_produto(item) for item in brutos]
 
-    def _invocar_cliente_real_produtos(self, tenant_id: str, params: dict[str, Any], t0: float) -> list[WLProdutoDTO]:
+    def obter_produto(self, produto_id: str, tenant_id: str = "tenant_piloto") -> WLProdutoDTO:
+        modo = self._obter_modo()
+        t0 = time.time()
+
+        if modo == "mock":
+            res = self.mock_adapter.obter_produto(produto_id)
+            latencia = int((time.time() - t0) * 1000)
+            self.registrar_chamada(tenant_id, "GET", f"/produtos/{produto_id}", 200, latencia)
+            return res
+
+        bruto = self._chamar_api_real(tenant_id, "GET", f"/produtos/{produto_id}", t0)
+        return self._traduzir_produto(bruto)
+
+    def consultar_slots(self, tenant_id: str = "tenant_piloto", tipo: str = "prova", data_inicio: str = "2026-09-01") -> list[WLSlotDTO]:
+        modo = self._obter_modo()
+        t0 = time.time()
+
+        if modo == "mock":
+            res = self.mock_adapter.consultar_slots(tipo, data_inicio)
+            latencia = int((time.time() - t0) * 1000)
+            self.registrar_chamada(tenant_id, "GET", "/agenda/slots", 200, latencia)
+            return res
+
+        brutos = self._chamar_api_real(
+            tenant_id, "GET", "/agenda/slots", t0, params={"tipo": tipo, "data_inicio": data_inicio}
+        )
+        return [
+            WLSlotDTO(
+                data=item["data"],
+                hora=item["hora"],
+                vagas_totais=item["vagas_totais"],
+                vagas_livres=item["vagas_livres"],
+            )
+            for item in brutos
+        ]
+
+    def criar_agendamento(self, tenant_id: str = "tenant_piloto", **dados) -> WLAgendamentoDTO:
+        modo = self._obter_modo()
+        t0 = time.time()
+
+        if modo == "mock":
+            res = self.mock_adapter.criar_agendamento(dados)
+            latencia = int((time.time() - t0) * 1000)
+            self.registrar_chamada(tenant_id, "POST", "/agenda", 201, latencia)
+            return res
+
+        bruto = self._chamar_api_real(tenant_id, "POST", "/agenda", t0, json_body=dados)
+        return WLAgendamentoDTO(
+            id=bruto["id"],
+            status=bruto["status"],
+            tipo=dados.get("tipo", "prova"),
+            data=dados.get("data", ""),
+            hora=dados.get("hora", ""),
+            cliente_nome=dados.get("cliente_nome", ""),
+            cliente_telefone=dados.get("cliente_telefone", ""),
+            produto_id=dados.get("produto_id"),
+            observacao=dados.get("observacao"),
+        )
+
+    @staticmethod
+    def _traduzir_produto(item: dict[str, Any]) -> WLProdutoDTO:
+        """Camada anticorrupção: nenhum campo cru do ERP (codigo, valor_locacao, status) vaza (I7)."""
+        return WLProdutoDTO(
+            id=item["id"],
+            ref=item.get("codigo", item["id"]),
+            nome=item["nome"],
+            categoria=item.get("categoria", "Vestidos"),
+            tamanho=item.get("tamanho", "U"),
+            cor=item.get("cor", "Única"),
+            estilo=item.get("estilo"),
+            valor_aluguel=float(item.get("valor_locacao", 0.0)),
+            disponivel=item.get("status") == "disponivel",
+            imagem=item.get("foto_url"),
+        )
+
+    def _chamar_api_real(
+        self,
+        tenant_id: str,
+        metodo: str,
+        rota: str,
+        t0: float,
+        params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
+    ) -> Any:
+        """
+        Cliente HTTP real com timeout 8s e retry 2x em 5xx, sem retry em 4xx (I2, I4, AC 4, AC 5).
+        Usado por todas as rotas do contrato §7.2 quando `WL_MODO=real`.
+        """
         import httpx
         timeout = 8.0  # Timeout estrito de 8s (I2, AC 4)
         attempts = 0
@@ -178,67 +266,42 @@ class WebLocacaoService:
 
         base_url = os.getenv("WL_BASE_URL", "https://api.weblocacao.fake.com")
         api_key = os.getenv("WL_API_KEY", "secret_key")
-
         headers = {"Authorization": f"Bearer {api_key}"}
 
         while attempts <= max_retries_5xx:
             attempts += 1
             try:
                 with httpx.Client(timeout=timeout) as client:
-                    resp = client.get(f"{base_url}/produtos", headers=headers, params=params)
+                    if metodo == "GET":
+                        resp = client.get(f"{base_url}{rota}", headers=headers, params=params)
+                    else:
+                        resp = client.post(f"{base_url}{rota}", headers=headers, json=json_body)
+
                     latencia = int((time.time() - t0) * 1000)
 
-                    if resp.status_code == 200:
-                        self.registrar_chamada(tenant_id, "GET", "/produtos", 200, latencia)
-                        # Tradução da camada anticorrupção (I7, AC 2)
-                        brutos = resp.json()
-                        return [
-                            WLProdutoDTO(
-                                id=item["id"],
-                                ref=item.get("codigo", item["id"]),
-                                nome=item["nome"],
-                                categoria=item.get("categoria", "Vestidos"),
-                                tamanho=item.get("tamanho", "U"),
-                                cor=item.get("cor", "Única"),
-                                estilo=item.get("estilo"),
-                                valor_aluguel=float(item.get("valor_locacao", 0.0)),
-                                disponivel=item.get("status") == "disponivel",
-                                imagem=item.get("foto_url"),
-                            )
-                            for item in brutos
-                        ]
+                    if 200 <= resp.status_code < 300:
+                        self.registrar_chamada(tenant_id, metodo, rota, resp.status_code, latencia)
+                        return resp.json()
                     elif resp.status_code >= 500 and attempts <= max_retries_5xx:
-                        logger.warning(f"Erro 5xx na API WL (tentativa {attempts}). Retentando...")
+                        logger.warning(f"Erro 5xx na API WL (rota={rota}, tentativa {attempts}). Retentando...")
                         time.sleep(0.5 * attempts)
                         continue
                     else:
                         # 4xx sem retry (I4)
-                        self.registrar_chamada(tenant_id, "GET", "/produtos", resp.status_code, latencia, erro=resp.text)
+                        self.registrar_chamada(tenant_id, metodo, rota, resp.status_code, latencia, erro=resp.text)
                         raise WLException(f"Erro da API WebLocação: status {resp.status_code}", status_code=resp.status_code)
             except httpx.TimeoutException:
                 latencia = int((time.time() - t0) * 1000)
-                self.registrar_chamada(tenant_id, "GET", "/produtos", 504, latencia, erro="Timeout 8s excedido")
+                self.registrar_chamada(tenant_id, metodo, rota, 504, latencia, erro="Timeout 8s excedido")
                 raise WLException("Timeout de 8s excedido na API da WebLocação.", status_code=504)
+            except WLException:
+                raise
             except Exception as e:
                 latencia = int((time.time() - t0) * 1000)
-                self.registrar_chamada(tenant_id, "GET", "/produtos", 500, latencia, erro=str(e))
+                self.registrar_chamada(tenant_id, metodo, rota, 500, latencia, erro=str(e))
                 raise WLException(f"Falha de conexão com a WebLocação: {e}", status_code=500)
 
         raise WLException("Falha crítica de comunicação com a WebLocação após retries.", status_code=500)
-
-    def consultar_slots(self, tenant_id: str = "tenant_piloto", tipo: str = "prova", data_inicio: str = "2026-09-01") -> list[WLSlotDTO]:
-        t0 = time.time()
-        res = self.mock_adapter.consultar_slots(tipo, data_inicio)
-        latencia = int((time.time() - t0) * 1000)
-        self.registrar_chamada(tenant_id, "GET", "/agenda/slots", 200, latencia)
-        return res
-
-    def criar_agendamento(self, tenant_id: str = "tenant_piloto", **dados) -> WLAgendamentoDTO:
-        t0 = time.time()
-        res = self.mock_adapter.criar_agendamento(dados)
-        latencia = int((time.time() - t0) * 1000)
-        self.registrar_chamada(tenant_id, "POST", "/agenda", 201, latencia)
-        return res
 
 
 weblocacao_service = WebLocacaoService()
