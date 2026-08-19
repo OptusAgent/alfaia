@@ -100,6 +100,21 @@ def test_criar_agendamento_real_mode_confirma_via_fake_erp(service_real):
     assert ag.id.startswith("wl_ag_")
 
 
+def test_listar_agendamentos_real_mode(service_real):
+    ag = service_real.criar_agendamento(
+        tenant_id="t1",
+        tipo="prova",
+        data="2026-09-15",
+        hora="11:00",
+        cliente_nome="Lead Listagem",
+        cliente_telefone="5585999997777",
+    )
+    assert ag.status == "confirmado"
+
+    itens = service_real.listar_agendamentos(tenant_id="t1", data_inicio="2026-09-15", data_fim="2026-09-15")
+    assert any(i.cliente_nome == "Lead Listagem" for i in itens)
+
+
 def test_produto_inexistente_real_mode_gera_wlexception_4xx(service_real):
     with pytest.raises(WLException) as excinfo:
         service_real.obter_produto("nao_existe_123", tenant_id="t1")

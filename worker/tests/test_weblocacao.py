@@ -28,6 +28,12 @@ def test_wl_mock_adapter_parity():
     assert ag.id == "wl_ag_999"
     assert ag.status == "confirmado"
 
+    # 5. GET /agenda (story 5.6)
+    itens = mock.listar_agendamentos(data_inicio="2026-09-01", data_fim="2026-09-30")
+    assert len(itens) == 2
+    assert itens[0].origem == "loja"
+    assert itens[0].cliente_nome == "Fernanda Alencar"
+
 
 def test_wl_anti_corruption_layer():
     """Testa a camada anticorrupção garantindo que nenhum campo bruto do ERP vaza sem tradução (AC 2, I7)."""

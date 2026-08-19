@@ -28,6 +28,9 @@ Construir a camada anticorrupção contra o ERP WebLocação (mock → real), co
 | S-20 | Consulta de produtos | M | AC 12.1–12.4, I1–I8 |
 | S-21 | Slots e criação de agendamento | M | AC 12.1–12.4, I1–I8 |
 | S-22 | Sync de agenda e tela por período | M | AC 11.1–11.4 |
+| — (5.6) | Persistência real de wl_chamadas e agendamentos | M | I3, I6, AC 11.2–11.3 |
+
+Story 5.6 é emergente, criada em 2026-08-19 a partir de um achado de @devops durante ativação em produção (S-19/S-21/S-22 fechadas como `Done` sem que `wl_chamadas`/`agendamentos` de fato persistissem no Postgres — ver `docs/stories/5.6.story.md`). Sem ID `S-` original do PRD.
 
 ## Dependências
 

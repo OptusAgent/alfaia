@@ -51,6 +51,21 @@ class SupabaseRestService:
         async with httpx.AsyncClient(timeout=30) as client:
             return await client.request(method, endpoint, headers=self._headers(kwargs.pop("prefer", None)), **kwargs)
 
+    def _request_sync(self, method: str, path: str, **kwargs: Any) -> httpx.Response | None:
+        """
+        Variante síncrona de `_request`, para os serviços que ainda não são async
+        (`WebLocacaoService`, `SchedulingService`, `AgendaSyncService` — ver Dev Notes
+        da story 5.6). Sem client injetável: cada chamada abre e fecha seu próprio
+        `httpx.Client`, mesmo padrão já usado em `weblocacao_service._chamar_api_real`.
+        """
+        if not self.configurado:
+            logger.warning("Supabase REST nao configurado no worker (sync).")
+            return None
+
+        endpoint = f"{self.url}/rest/v1/{path.lstrip('/')}"
+        with httpx.Client(timeout=30) as client:
+            return client.request(method, endpoint, headers=self._headers(kwargs.pop("prefer", None)), **kwargs)
+
     async def buscar_canal_por_token(self, token: str) -> dict[str, Any] | None:
         token_q = quote(token, safe="")
         res = await self._request(
@@ -174,6 +189,107 @@ class SupabaseRestService:
         )
         if not res or res.status_code >= 300:
             logger.warning("Nao foi possivel registrar captura de webhook no Supabase: %s", res.text[:300] if res else "sem resposta")
+
+    def registrar_wl_chamada(
+        self,
+        tenant_id: str,
+        metodo: str,
+        rota: str,
+        status_code: int,
+        latencia_ms: int,
+        erro: str | None = None,
+    ) -> None:
+        """Grava telemetria de chamada ao WebLocação em wl_chamadas (I3, story 5.6, AC 1). Não bloqueante: nunca derruba o chamador."""
+        try:
+            res = self._request_sync(
+                "POST",
+                "wl_chamadas",
+                json={
+                    "tenant_id": tenant_id,
+                    "metodo": metodo,
+                    "rota": rota,
+                    "status_code": status_code,
+                    "latencia_ms": latencia_ms,
+                    "erro": erro,
+                },
+                prefer="return=minimal",
+            )
+            if res is not None and res.status_code >= 300:
+                logger.warning("Nao foi possivel registrar chamada WL em wl_chamadas: %s", res.text[:300])
+        except Exception as e:
+            logger.warning("Falha ao gravar wl_chamadas (nao bloqueante): %s", e)
+
+    def buscar_agendamento_ativo(self, tenant_id: str, lead_id: str, data: str, hora: str) -> dict[str, Any] | None:
+        """
+        Consulta se já existe agendamento ativo para (tenant_id, lead_id, data, hora) — trava de
+        idempotência I6 respaldada pelo índice `agendamentos_idempotencia` (story 5.6, AC 2).
+        """
+        try:
+            res = self._request_sync(
+                "GET",
+                (
+                    f"agendamentos?select=*&tenant_id=eq.{quote(tenant_id, safe='')}"
+                    f"&lead_id=eq.{quote(lead_id, safe='')}&data=eq.{quote(data, safe='')}"
+                    f"&hora=eq.{quote(hora, safe='')}&status=eq.ativo&limit=1"
+                ),
+            )
+            if res is None or res.status_code >= 300:
+                return None
+            rows = res.json()
+            return rows[0] if rows else None
+        except Exception as e:
+            logger.warning("Falha ao consultar agendamento ativo (nao bloqueante): %s", e)
+            return None
+
+    def inserir_agendamento(self, dados: dict[str, Any]) -> dict[str, Any] | None:
+        """
+        Insere um agendamento confirmado em `agendamentos` (story 5.6, AC 2). Um 409 aqui é o
+        índice `agendamentos_idempotencia` ou `(tenant_id, wl_agendamento_id)` pegando uma corrida
+        concorrente — trata como caminho idempotente, não como erro (I6).
+        """
+        try:
+            res = self._request_sync("POST", "agendamentos", json=dados, prefer="return=representation")
+            if res is None:
+                return None
+            if res.status_code == 409:
+                logger.info("Insercao de agendamento colidiu com constraint de idempotencia (tratado como esperado).")
+                return None
+            if res.status_code >= 300:
+                logger.warning("Falha ao inserir agendamento em agendamentos: %s", res.text[:300])
+                return None
+            rows = res.json()
+            return rows[0] if rows else None
+        except Exception as e:
+            logger.warning("Falha ao gravar agendamentos (nao bloqueante): %s", e)
+            return None
+
+    def listar_agendamentos_periodo(
+        self,
+        tenant_id: str,
+        data_inicio: str,
+        data_fim: str,
+        tipo: str | None = None,
+        origem: str | None = None,
+    ) -> list[dict[str, Any]] | None:
+        """Lê agendamentos reais do Postgres por período (story 5.6, AC 5). None quando não configurado."""
+        try:
+            filtro = (
+                f"agendamentos?select=*&tenant_id=eq.{quote(tenant_id, safe='')}"
+                f"&data=gte.{quote(data_inicio, safe='')}&data=lte.{quote(data_fim, safe='')}"
+                "&order=data.asc,hora.asc"
+            )
+            if tipo:
+                filtro += f"&tipo=eq.{quote(tipo, safe='')}"
+            if origem:
+                filtro += f"&origem=eq.{quote(origem, safe='')}"
+
+            res = self._request_sync("GET", filtro)
+            if res is None or res.status_code >= 300:
+                return None
+            return res.json()
+        except Exception as e:
+            logger.warning("Falha ao listar agendamentos por periodo (nao bloqueante): %s", e)
+            return None
 
     async def atualizar_status_canal(self, canal_id: str, status: str, raw: dict[str, Any] | None = None) -> None:
         res = await self._request(

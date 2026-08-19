@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.services.weblocacao_service import weblocacao_service, WLException
+from app.services.supabase_rest import supabase_rest_service
 
 logger = logging.getLogger("alfaia.scheduling")
 
@@ -90,6 +91,32 @@ class SchedulingService:
             None,
         )
 
+        # Fallback de idempotência via Postgres: cobre restart do processo/múltiplas réplicas,
+        # onde a lista em memória de outra instância não teria visibilidade do agendamento
+        # (story 5.6, AC 2). No-op silencioso se `supabase_rest_service` não estiver configurado.
+        if not agendamento_existente:
+            try:
+                registro_db = supabase_rest_service.buscar_agendamento_ativo(tenant_id, lead_id, data, hora)
+            except Exception as e:
+                logger.warning(f"Falha inesperada ao consultar idempotencia em Postgres (nao bloqueante): {e}")
+                registro_db = None
+            if registro_db:
+                agendamento_existente = AgendamentoModel(
+                    id=registro_db["id"],
+                    tenant_id=registro_db["tenant_id"],
+                    wl_agendamento_id=registro_db.get("wl_agendamento_id") or "",
+                    lead_id=registro_db["lead_id"],
+                    tipo=registro_db["tipo"],
+                    data=registro_db["data"],
+                    hora=registro_db["hora"],
+                    cliente_nome=registro_db.get("cliente_nome") or "",
+                    cliente_telefone=registro_db.get("cliente_telefone") or "",
+                    produto_ref=registro_db.get("produto_ref"),
+                    origem=registro_db.get("origem", "automacao"),
+                    status=registro_db.get("status", "ativo"),
+                )
+                self.agendamentos.append(agendamento_existente)
+
         if agendamento_existente:
             logger.info(f"Agendamento idempotente retornado sem duplicar reserva no ERP [id={agendamento_existente.id}]")
             return {
@@ -137,6 +164,36 @@ class SchedulingService:
                 status="ativo",
             )
             self.agendamentos.append(novo_agendamento)
+
+            # 5. Persiste em Postgres real (story 5.6, AC 2, AC 4) — só depois do WL confirmar (nunca o
+            # inverso). Falha aqui não desfaz o agendamento já confirmado no ERP nem quebra a resposta
+            # ao lead: fica auditável pelo log de erro para investigação, sem prometer nada de novo a ele.
+            try:
+                registro_persistido = supabase_rest_service.inserir_agendamento(
+                    {
+                        # "id" omitido de propósito: a coluna tem default gen_random_uuid() no Postgres;
+                        # o "id" do AgendamentoModel local (ex. "ag_1") é só a chave da lista em memória.
+                        "tenant_id": tenant_id,
+                        "wl_agendamento_id": res_wl.id,
+                        "lead_id": lead_id,
+                        "tipo": tipo,
+                        "data": data,
+                        "hora": hora,
+                        "cliente_nome": cliente_nome,
+                        "cliente_telefone": cliente_telefone,
+                        "produto_ref": produto_ref,
+                        "origem": "automacao",
+                        "status": "ativo",
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Falha inesperada ao persistir agendamento (nao bloqueante): {e}")
+                registro_persistido = None
+            if registro_persistido is None and supabase_rest_service.configurado:
+                logger.error(
+                    f"Agendamento confirmado no WL (wl_id={res_wl.id}) mas NAO foi possivel persistir em "
+                    f"agendamentos — investigar manualmente [tenant={tenant_id}, lead={lead_id}, data={data} {hora}]."
+                )
 
             logger.info(f"Novo agendamento criado com sucesso [wl_id={res_wl.id}, local_id={novo_agendamento.id}]")
             return {

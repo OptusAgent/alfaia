@@ -6,6 +6,7 @@ from typing import Any
 
 from app.services.scheduling_service import scheduling_service, AgendamentoModel
 from app.services.weblocacao_service import weblocacao_service
+from app.services.supabase_rest import supabase_rest_service
 
 logger = logging.getLogger("alfaia.agenda_sync")
 
@@ -34,48 +35,53 @@ class AgendaSyncService:
         """
         simulated_now = now or datetime.now()
 
-        # Simulação de agendamentos vindos do balcão/ERP (origem='loja')
-        agendamentos_erp = [
-            {
-                "wl_id": "wl_ag_loja_01",
-                "tipo": "prova",
-                "data": "2026-09-05",
-                "hora": "10:00",
-                "cliente_nome": "Fernanda Alencar",
-                "cliente_telefone": "5585999887766",
-                "origem": "loja",
-            },
-            {
-                "wl_id": "wl_ag_loja_02",
-                "tipo": "retirada",
-                "data": "2026-09-12",
-                "hora": "15:00",
-                "cliente_nome": "Juliana Paes",
-                "cliente_telefone": "5585988776655",
-                "origem": "loja",
-            },
-        ]
+        # Busca real no ERP via camada anticorrupção — respeita WL_MODO (mock/real) (story 5.6, AC 3)
+        itens_erp = weblocacao_service.listar_agendamentos(
+            tenant_id=tenant_id, data_inicio=data_inicio, data_fim=data_fim
+        )
 
         novos_adicionados = 0
-        for item in agendamentos_erp:
+        for item in itens_erp:
             # Evita duplicar se já existir na lista local
-            ja_existe = any(a.wl_agendamento_id == item["wl_id"] for a in scheduling_service.agendamentos)
+            ja_existe = any(a.wl_agendamento_id == item.id for a in scheduling_service.agendamentos)
             if not ja_existe:
                 novo = AgendamentoModel(
                     id=f"ag_sync_{len(scheduling_service.agendamentos) + 1}",
                     tenant_id=tenant_id,
-                    wl_agendamento_id=item["wl_id"],
+                    wl_agendamento_id=item.id,
                     lead_id="lead_erp_externo",
-                    tipo=item["tipo"],
-                    data=item["data"],
-                    hora=item["hora"],
-                    cliente_nome=item["cliente_nome"],
-                    cliente_telefone=item["cliente_telefone"],
-                    origem=item["origem"],
+                    tipo=item.tipo,
+                    data=item.data,
+                    hora=item.hora,
+                    cliente_nome=item.cliente_nome,
+                    cliente_telefone=item.cliente_telefone,
+                    produto_ref=item.produto,
+                    origem=item.origem,
                     status="ativo",
                     sincronizado_em=simulated_now,
                 )
                 scheduling_service.agendamentos.append(novo)
+                # Persiste em Postgres real (story 5.6, AC 3, AC 5) — 409 tratado como já sincronizado
+                # (concorrência entre execuções do loop), não como erro. Falha aqui não interrompe o
+                # restante da sincronização (I2).
+                try:
+                    supabase_rest_service.inserir_agendamento(
+                        {
+                            "tenant_id": tenant_id,
+                            "wl_agendamento_id": item.id,
+                            "lead_id": None,
+                            "tipo": item.tipo,
+                            "data": item.data,
+                            "hora": item.hora,
+                            "cliente_nome": item.cliente_nome,
+                            "cliente_telefone": item.cliente_telefone,
+                            "produto_ref": item.produto,
+                            "origem": item.origem,
+                            "status": "ativo",
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Falha inesperada ao persistir agendamento sincronizado (nao bloqueante): {e}")
                 novos_adicionados += 1
 
         self.ultimo_sync_em = simulated_now
@@ -97,7 +103,16 @@ class AgendaSyncService:
     ) -> list[dict[str, Any]]:
         """
         Retorna agendamentos filtrados por intervalo de datas (dia/semana/mês), tipo e origem (AC 1, AC 11.1, AC 11.2).
+        Lê do Postgres real quando `supabase_rest_service` está configurado (story 5.6, AC 5); cai para
+        a lista em memória do processo como fallback (ambiente sem credencial, ex.: testes).
         """
+        if supabase_rest_service.configurado:
+            registros_db = supabase_rest_service.listar_agendamentos_periodo(
+                tenant_id=tenant_id, data_inicio=data_inicio, data_fim=data_fim, tipo=tipo, origem=origem
+            )
+            if registros_db is not None:
+                return registros_db
+
         dt_inicio = datetime.fromisoformat(data_inicio).date()
         dt_fim = datetime.fromisoformat(data_fim).date()
 
