@@ -30,6 +30,9 @@ Implementar o motor de IA com registro de tools, debounce de mensagens, transcri
 | S-16 | Transcrição de áudio | S | AC 8.5 |
 | S-17 | Painel de conversa realtime | M | AC 8.6, NFR9 (§20) |
 | S-18 | Transbordo: assumir e devolver | M | AC 13.1–13.5 |
+| — (4.8) | Conectar tool-calling real da IA (OpenRouter function calling) | L | AC 8.2, 8.3, I5, P3 |
+
+Story 4.8 é emergente, criada em 2026-08-19 a partir de um achado de @devops durante a ativação da story 5.6: mesmo com S-15 (4.3) `Done`, a IA nunca chama tool nenhuma quando o LLM responde de verdade — só no fallback por keyword-match usado em desenvolvimento sem `OPENROUTER_API_KEY`. Ver `docs/stories/4.8.story.md`. Sem ID `S-` original do PRD.
 
 ## Dependências
 
