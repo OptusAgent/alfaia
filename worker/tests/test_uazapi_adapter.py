@@ -167,6 +167,32 @@ def test_uazapi_normalizar_webhook_payload_real_message_chatid_content():
     assert normalized[0].wa_message_id == "wamid.real.uazapi.001"
 
 
+def test_uazapi_normalizar_webhook_extrai_timestamp_ms_do_message_node():
+    """Regressão: payload real da UAZAPI traz messageTimestamp (ms) dentro de
+    `message`, não em `data`/top-level. Sem checar message_node, o parser caía
+    no fallback fixo e toda mensagem de lead nascia com uma data de mais de um
+    ano atrás, sumindo da ordenação da conversa no Portal."""
+    adapter = UazapiAdapter()
+    raw_payload = json.dumps({
+        "EventType": "messages",
+        "instanceName": "testealfaia",
+        "message": {
+            "chatid": "558591733321@s.whatsapp.net",
+            "content": "Dia 25 de agosto",
+            "fromMe": False,
+            "messageTimestamp": 1787142609000,
+            "messageid": "AC211B5267402B502F4AD15A4A421331",
+            "senderName": "valmirmoreirajunior",
+            "text": "Dia 25 de agosto",
+        },
+    }).encode("utf-8")
+
+    normalized = adapter.normalizar_webhook(raw_payload, {})
+
+    assert len(normalized) == 1
+    assert normalized[0].timestamp == 1787142609
+
+
 def test_uazapi_ignora_mensagem_enviada_pela_api_com_boolean_string():
     adapter = UazapiAdapter()
     raw_payload = json.dumps({

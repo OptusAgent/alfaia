@@ -3,6 +3,7 @@ import logging
 import asyncio
 import random
 import re
+from datetime import datetime, timezone
 from typing import Any
 import httpx
 from app.adapters.base import CanalAdapter, Capabilities, PayloadNormalizado, ResultadoEnvio
@@ -312,11 +313,19 @@ class UazapiAdapter:
             get_any(key_node, "id", "ID"),
             "wamid.unknown",
         )
-        timestamp = first_value(
+        timestamp_bruto = first_value(
             get_any(data, "timestamp", "Timestamp", "messageTimestamp", "MessageTimestamp"),
             get_any(data_node, "timestamp", "Timestamp", "messageTimestamp", "MessageTimestamp"),
-            1754570000,
+            get_any(message_node, "timestamp", "Timestamp", "messageTimestamp", "MessageTimestamp"),
         )
+        agora_epoch = int(datetime.now(timezone.utc).timestamp())
+        if str(timestamp_bruto).isdigit():
+            timestamp_epoch = int(timestamp_bruto)
+            # UAZAPI/Baileys envia messageTimestamp em milissegundos (13 digitos); normaliza para segundos.
+            if timestamp_epoch > 10_000_000_000:
+                timestamp_epoch //= 1000
+        else:
+            timestamp_epoch = agora_epoch
         midia_url = first_value(get_any(data, "midia_url", "mediaUrl", "MediaUrl"), get_any(data_node, "mediaUrl", "MediaUrl"))
         midia_tipo = first_value(get_any(data, "midia_tipo", "mediaType", "MediaType"), get_any(data_node, "mediaType", "MediaType"), "image" if midia_url else "text")
         if midia_tipo not in ("text", "audio", "image", "document"):
@@ -332,7 +341,7 @@ class UazapiAdapter:
             midia_url=midia_url,
             midia_tipo=midia_tipo,
             wa_message_id=wa_message_id,
-            timestamp=int(timestamp) if str(timestamp).isdigit() else 1754570000,
+            timestamp=timestamp_epoch,
             data_atual=get_any(data, "data_atual", "dataAtual") or "Sexta-feira, 7 de agosto de 2026, 14:32",
         )
         return [payload]
