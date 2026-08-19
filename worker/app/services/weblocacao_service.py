@@ -4,6 +4,8 @@ import logging
 from typing import Any
 from pydantic import BaseModel, Field
 
+from app.services.supabase_rest import supabase_rest_service
+
 logger = logging.getLogger("alfaia.weblocacao")
 
 
@@ -38,6 +40,18 @@ class WLAgendamentoDTO(BaseModel):
     cliente_telefone: str
     produto_id: str | None = None
     observacao: str | None = None
+
+
+class WLAgendaItemDTO(BaseModel):
+    """Item de GET /agenda (§7.2) — agendamento visto do lado do ERP, origem loja ou automação."""
+    id: str
+    tipo: str
+    data: str
+    hora: str
+    cliente_nome: str
+    cliente_telefone: str
+    produto: str | None = None
+    origem: str = "loja"
 
 
 class WLException(Exception):
@@ -119,6 +133,35 @@ class WLMockAdapter:
             observacao=dados.get("observacao"),
         )
 
+    def listar_agendamentos(self, data_inicio: str, data_fim: str | None = None) -> list[WLAgendaItemDTO]:
+        """
+        Mock de GET /agenda (§7.2) — agendamentos feitos direto no balcão da loja (origem='loja').
+        Datas fixas (não derivadas de data_inicio/data_fim) para simular reservas reais já existentes
+        no ERP, na mesma linha do fixture usado pela story 5.4/5.6.
+        """
+        return [
+            WLAgendaItemDTO(
+                id="wl_ag_loja_01",
+                tipo="prova",
+                data="2026-09-05",
+                hora="10:00",
+                cliente_nome="Fernanda Alencar",
+                cliente_telefone="5585999887766",
+                produto="V-101",
+                origem="loja",
+            ),
+            WLAgendaItemDTO(
+                id="wl_ag_loja_02",
+                tipo="retirada",
+                data="2026-09-12",
+                hora="15:00",
+                cliente_nome="Juliana Paes",
+                cliente_telefone="5585988776655",
+                produto="T-201",
+                origem="loja",
+            ),
+        ]
+
 
 class WebLocacaoService:
     """
@@ -143,7 +186,10 @@ class WebLocacaoService:
 
     def registrar_chamada(self, tenant_id: str, metodo: str, rota: str, status_code: int, latencia_ms: int, erro: str | None = None):
         """
-        Registra telemétrica de chamadas à API da WebLocação em wl_chamadas (I3, AC 3).
+        Registra telemétrica de chamadas à API da WebLocação em wl_chamadas (I3, story 5.6 AC 1).
+        Grava em Postgres via `supabase_rest_service` (no-op silencioso se não configurado — ex.:
+        testes sem credencial). `chamadas_log` em memória é mantido só como espelho local rápido,
+        não é mais a fonte de verdade.
         """
         registro = {
             "tenant_id": tenant_id,
@@ -156,6 +202,11 @@ class WebLocacaoService:
         }
         self.chamadas_log.append(registro)
         logger.info(f"WL Chamada Registrada [rota={rota}, status={status_code}, latencia={latencia_ms}ms]")
+        try:
+            supabase_rest_service.registrar_wl_chamada(tenant_id, metodo, rota, status_code, latencia_ms, erro)
+        except Exception as e:
+            # Auditoria não pode nunca derrubar a chamada real ao WL nem a resposta ao lead (I2, P3, AC 4)
+            logger.warning(f"Falha inesperada ao registrar wl_chamadas (nao bloqueante): {e}")
 
     def buscar_produtos(self, tenant_id: str = "tenant_piloto", **params) -> list[WLProdutoDTO]:
         modo = self._obter_modo()
@@ -229,6 +280,39 @@ class WebLocacaoService:
             produto_id=dados.get("produto_id"),
             observacao=dados.get("observacao"),
         )
+
+    def listar_agendamentos(
+        self, tenant_id: str = "tenant_piloto", data_inicio: str = "2026-09-01", data_fim: str | None = None
+    ) -> list[WLAgendaItemDTO]:
+        """
+        GET /agenda (§7.2) — agendamentos vistos do lado do ERP, para a sincronização de agenda
+        distinguir origem='loja' vs 'automacao' (story 5.4 AC 11.2/11.3, story 5.6 AC 3).
+        """
+        modo = self._obter_modo()
+        t0 = time.time()
+
+        if modo == "mock":
+            res = self.mock_adapter.listar_agendamentos(data_inicio, data_fim)
+            latencia = int((time.time() - t0) * 1000)
+            self.registrar_chamada(tenant_id, "GET", "/agenda", 200, latencia)
+            return res
+
+        brutos = self._chamar_api_real(
+            tenant_id, "GET", "/agenda", t0, params={"data_inicio": data_inicio, "data_fim": data_fim}
+        )
+        return [
+            WLAgendaItemDTO(
+                id=item["id"],
+                tipo=item["tipo"],
+                data=item["data"],
+                hora=item["hora"],
+                cliente_nome=item["cliente_nome"],
+                cliente_telefone=item["cliente_telefone"],
+                produto=item.get("produto"),
+                origem=item.get("origem", "loja"),
+            )
+            for item in brutos
+        ]
 
     @staticmethod
     def _traduzir_produto(item: dict[str, Any]) -> WLProdutoDTO:
