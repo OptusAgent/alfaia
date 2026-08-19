@@ -39,6 +39,7 @@ O PRD (§24) define apenas `local` e `producao`, sem staging. **Esta seção est
 | Desenvolvimento e testes | Cloud Run (GCP) | Portal + Worker | Iteração rápida, ambiente descartável/escalável a zero, sem gestão de servidor |
 | Pós-venda / produção do cliente | VPS — EasyPanel (Hostinger) **ou** Dockplot (Contabo) | Portal + Worker | Após fechamento comercial e apresentação ao cliente; custo fixo previsível, controle total do host |
 | Banco de dados (todas as fases) | Supabase | Postgres + Auth + Realtime + Storage | Único banco em todas as fases — não migra com o resto da infra |
+| **wl-fake-api** (dev/teste apenas) | Cloud Run (GCP) ou local | Não faz parte da stack de produção do cliente | ERP fake da WebLocação, para exercitar `WL_MODO=real` sem depender do contrato real ainda não fechado (§7, Q1–Q3). Segue o mesmo requisito de `Dockerfile` portável, mas nunca é implantado na VPS do cliente — ver `wl-fake-api/README.md` |
 
 **Implicações de arquitetura:**
 - Portal e Worker DEVEM ser containerizáveis via Docker (`Dockerfile` em cada serviço) desde o início — é o requisito comum a Cloud Run e a EasyPanel/Dockplot.
