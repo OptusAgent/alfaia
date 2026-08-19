@@ -67,6 +67,42 @@ class EncerrarInput(BaseModel):
     motivo: str | None = Field(None, description="Motivo textual do encerramento")
 
 
+# Descrição de nível de função (não de campo) para cada tool — texto que o LLM lê para
+# decidir QUANDO chamar, na mesma linha do efeito documentado em PRD §8.2 e Dev Notes da story 4.3.
+TOOL_DESCRIPTIONS: dict[str, str] = {
+    "buscar_produtos": (
+        "Busca peças disponíveis no catálogo real da WebLocação por evento, estilo, categoria, "
+        "cor, tamanho e período. Chame antes de dizer que uma peça está disponível ou de citar "
+        "um valor — nunca inventar disponibilidade ou preço sem o resultado desta tool."
+    ),
+    "consultar_slots": (
+        "Consulta horários livres reais para agendamento (prova, retirada, ajuste) num período. "
+        "Chame antes de oferecer qualquer horário ao lead — nunca inventar disponibilidade de agenda."
+    ),
+    "agendar": (
+        "Cria de fato um agendamento na WebLocação para o lead atual. Só chamar depois que o lead "
+        "confirmar um horário retornado por consultar_slots nesta mesma conversa."
+    ),
+    "atualizar_lead": (
+        "Atualiza os dados de interesse do lead atual (evento, peça, tamanho, cor, valor estimado) "
+        "coletados na conversa até agora."
+    ),
+    "mover_status": (
+        "Move o lead para outro status no Kanban conforme a evolução da conversa (ex.: qualificando, "
+        "orcamento, negociando, descartado). Nunca mover para 'ganho' — isso é exclusivo de humano."
+    ),
+    "registrar_interesse": "Registra um snapshot do interesse atual do lead para histórico.",
+    "abrir_transbordo": (
+        "Aciona atendimento humano quando a IA não consegue resolver, há erro de sistema/API, "
+        "ou o lead pede explicitamente para falar com uma pessoa."
+    ),
+    "encerrar": (
+        "Encerra o atendimento como descartado. Nunca chamar com desfecho 'ganho' — fechamento de "
+        "contrato é sempre decisão humana (MV1)."
+    ),
+}
+
+
 class ToolsRegistry:
     """
     Registro Central e Execuror das 8 Ferramentas do Motor de IA (PRD §8.2, AC 5).
@@ -83,6 +119,38 @@ class ToolsRegistry:
             "abrir_transbordo": self.abrir_transbordo,
             "encerrar": self.encerrar,
         }
+        self._modelos_entrada: dict[str, type[BaseModel]] = {
+            "buscar_produtos": BuscarProdutosInput,
+            "consultar_slots": ConsultarSlotsInput,
+            "agendar": AgendarInput,
+            "atualizar_lead": AtualizarLeadInput,
+            "mover_status": MoverStatusInput,
+            "registrar_interesse": RegistrarInteresseInput,
+            "abrir_transbordo": AbrirTransbordoInput,
+            "encerrar": EncerrarInput,
+        }
+
+    def function_schemas(self) -> list[dict[str, Any]]:
+        """
+        Gera os schemas de function-calling (formato OpenAI/OpenRouter) das 8 tools, a partir dos
+        mesmos modelos Pydantic usados para validar a execução — uma única fonte de verdade para
+        o que a IA pode chamar e para o que `executar_tool` de fato aceita (story 4.8, AC 1).
+        """
+        schemas = []
+        for nome, modelo in self._modelos_entrada.items():
+            parametros = modelo.model_json_schema()
+            parametros.pop("title", None)
+            schemas.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": nome,
+                        "description": TOOL_DESCRIPTIONS[nome],
+                        "parameters": parametros,
+                    },
+                }
+            )
+        return schemas
 
     def executar_tool(self, nome_tool: str, argumentos: dict[str, Any], contexto_execucao: dict[str, Any]) -> dict[str, Any]:
         if nome_tool not in self.ferramentas:
