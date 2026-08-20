@@ -233,6 +233,44 @@ def test_motor_loop_de_tool_calling_respeita_limite_de_iteracoes():
     assert len(resultados_loop) == AIEngineService.MAX_TOOL_CALL_ITERATIONS
 
 
+def test_motor_loop_reserva_ultima_iteracao_para_resposta_final_sem_tools():
+    """
+    Architect Gate 4.8 (follow-up obrigatório): se as tools já resolveram o pedido mas o modelo
+    ainda não formulou o texto final ao chegar na última iteração, o loop força uma chamada sem
+    `tools` em vez de estourar o limite com o agendamento/ação já concluído e responder com
+    "vou confirmar com a equipe" de forma enganosa.
+    """
+    chamadas = []
+
+    class FakeLLMResolveNaUltima:
+        def gerar_resposta(self, **kwargs):
+            chamadas.append(kwargs.get("tools"))
+            if len(chamadas) < AIEngineService.MAX_TOOL_CALL_ITERATIONS:
+                return LLMRespostaDTO(
+                    content=None,
+                    tool_calls=[LLMToolCallDTO(id=f"call_{len(chamadas)}", nome="atualizar_lead", argumentos={})],
+                )
+            return LLMRespostaDTO(content="Prontinho, já anotei aqui!", tool_calls=[])
+
+    engine = AIEngineService(llm_client=FakeLLMResolveNaUltima())
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    texto, transbordo = engine._processar_tool_calling_loop(
+        modelo="openai/gpt-4o-mini",
+        prompt_sistema="sistema",
+        mensagens_llm=[{"role": "user", "content": "oi"}],
+        temperatura=0.3,
+        ctx_exec={"tenant_id": "t1", "lead": lead, "lead_service": None, "conversa": {"estado": "ia"}},
+        tools_executadas=[],
+    )
+
+    assert transbordo is False
+    assert texto == "Prontinho, já anotei aqui!"
+    assert len(chamadas) == AIEngineService.MAX_TOOL_CALL_ITERATIONS
+    assert chamadas[-1] is None  # última chamada forçada sem tools
+    assert all(c is not None for c in chamadas[:-1])  # demais chamadas com tools normalmente
+
+
 def test_motor_continuacao_usa_historico_sem_reperguntar_evento_peca():
     engine = AIEngineService(llm_client=type("NoLLM", (), {"gerar_resposta": lambda self, **kwargs: None})())
     contato = ContatoDTO(id="cnt_1", tenant_id="t1", nome="Mariana", telefone="5585988112233", primeiro_contato_em="2026-08-10")

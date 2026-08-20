@@ -156,19 +156,29 @@ class AIEngineService:
         mensagens = list(mensagens_llm)
         tools = tools_registry.function_schemas()
 
-        for _ in range(self.MAX_TOOL_CALL_ITERATIONS):
+        for iteracao in range(self.MAX_TOOL_CALL_ITERATIONS):
+            ultima_iteracao = iteracao == self.MAX_TOOL_CALL_ITERATIONS - 1
             resposta = self.llm_client.gerar_resposta(
                 modelo=modelo,
                 prompt_sistema=prompt_sistema,
                 mensagens=mensagens,
                 temperatura=temperatura,
-                tools=tools,
+                # Última iteração: sem `tools` força o modelo a resumir em texto o que já foi
+                # feito, em vez de arriscar mais uma tool_call e estourar o limite sem nunca
+                # formular a resposta final (Architect Gate 4.8, follow-up obrigatório).
+                tools=None if ultima_iteracao else tools,
             )
             if resposta is None:
                 return None, False
 
             if not resposta.tool_calls:
                 return resposta.content, False
+
+            if ultima_iteracao:
+                # Sem `tools` no payload o modelo não deveria devolver tool_calls; se devolver
+                # mesmo assim, é comportamento fora do protocolo — trata como as demais falhas
+                # do loop, nunca deixa passar um resultado não confirmado (P3, I2).
+                break
 
             mensagens.append(
                 {
