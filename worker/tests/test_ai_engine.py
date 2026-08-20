@@ -271,8 +271,44 @@ def test_motor_loop_reserva_ultima_iteracao_para_resposta_final_sem_tools():
     assert all(c is not None for c in chamadas[:-1])  # demais chamadas com tools normalmente
 
 
+def test_motor_llm_configurado_mas_chamada_falha_nunca_cai_no_keyword_match_hardcoded():
+    """
+    Regressão do achado real em produção (2026-08-20): modelo configurado sem suporte a tool use
+    na OpenRouter faz `gerar_resposta` retornar `None` mesmo com `OPENROUTER_API_KEY` presente.
+    Antes deste fix, esse caso caía no `elif "casamento" in texto_inbound...` (código legado,
+    hardcoded), oferecendo sempre o mesmo vestido/tamanho e ignorando o que o lead pediu de fato.
+    Agora precisa cair no mesmo caminho seguro de `simular_erro_tool` — transbordo, sem inventar
+    produto nem assumir gênero.
+    """
+    class FakeLLMConfiguradoMasFalha:
+        configurado = True
+
+        def gerar_resposta(self, **kwargs):
+            return None
+
+    engine = AIEngineService(llm_client=FakeLLMConfiguradoMasFalha())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadDTO(id="lead_1", tenant_id="t1", contato_id="cnt_1", status="novo")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="primeiro_contato",
+        mensagens_inbound=["CASAMENTO"],
+    )
+
+    assert res.transbordo_acionado is True
+    assert "abrir_transbordo" in res.tools_executadas
+    assert "buscar_produtos" not in res.tools_executadas
+    assert "vestido" not in res.texto_resposta.lower()
+    assert "tamanho 42" not in res.texto_resposta.lower()
+
+
 def test_motor_continuacao_usa_historico_sem_reperguntar_evento_peca():
-    engine = AIEngineService(llm_client=type("NoLLM", (), {"gerar_resposta": lambda self, **kwargs: None})())
+    engine = AIEngineService(
+        llm_client=type("NoLLM", (), {"gerar_resposta": lambda self, **kwargs: None, "configurado": False})()
+    )
     contato = ContatoDTO(id="cnt_1", tenant_id="t1", nome="Mariana", telefone="5585988112233", primeiro_contato_em="2026-08-10")
     lead = LeadDTO(id="lead_1", tenant_id="t1", contato_id="cnt_1", status="qualificando")
 

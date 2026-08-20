@@ -102,10 +102,14 @@ class AIEngineService:
         mensagens_inbound: list[str],
         historico_mensagens: list[dict[str, Any]] | None,
     ) -> str:
+        # Só extrai fatos de mensagens do próprio lead — nunca das respostas passadas da IA. Sem
+        # esse filtro, um produto que a IA mencionou (ex.: "Vestido Longo...") volta a aparecer no
+        # histórico e o regex o encontra de novo, travando a resposta no primeiro item mencionado
+        # e ignorando qualquer correção real do lead nas mensagens seguintes.
         historico_textos = [
             str(msg.get("texto") or msg.get("conteudo") or "")
             for msg in (historico_mensagens or [])
-            if msg.get("texto") or msg.get("conteudo")
+            if msg.get("remetente") == "lead" and (msg.get("texto") or msg.get("conteudo"))
         ]
         fatos = AIEngineService._extrair_fatos_conversa([*historico_textos, *mensagens_inbound])
         nome = (contato_dto.nome or "").strip()
@@ -293,12 +297,21 @@ class AIEngineService:
 
         modelo = (
             (ia_config or {}).get("modelo")
-            or os.getenv("OPENROUTER_MODEL")
+            or os.getenv("LLM_MODEL_NAME")
             or "openai/gpt-4o-mini"
         )
         temperatura = float((ia_config or {}).get("temperatura") or 0.3)
 
+        # Distingue "LLM nunca foi configurado" (sem OPENROUTER_API_KEY — cai no fallback de
+        # desenvolvimento, AC 6) de "LLM configurado mas a chamada falhou" (erro de API, timeout,
+        # ou modelo sem suporte a tool use na OpenRouter — precisa do MESMO tratamento de erro que
+        # `simular_erro_tool`, nunca do fallback por keyword-match, que inventa produto/gênero).
+        # Achado real em produção (2026-08-20): deepseek-r1-distill-llama-70b não tem nenhum
+        # endpoint com tool use na OpenRouter — sem esta distinção, toda a conversa caía no
+        # keyword-match hardcoded (sempre "Vestido Longo Champanhe Sereia", tamanho 42).
+        llm_configurado = getattr(self.llm_client, "configurado", True)
         resposta_llm = None
+        llm_falhou_configurado = False
         if not simular_erro_tool:
             # Story 4.8: loop de tool-calling real — a IA decide se/quais tools chamar; a resposta
             # final só sai depois do resultado real delas estar na conversa (P3, I5, AC 2-4).
@@ -312,19 +325,28 @@ class AIEngineService:
             )
             if transbordo_do_loop:
                 transbordo_acionado = True
+            elif not resposta_llm and llm_configurado:
+                llm_falhou_configurado = True
 
         if resposta_llm:
             texto_resposta = resposta_llm
-        # Sem resposta do LLM (não configurado/falhou) ou simulação de erro: fallback determinístico
-        # de desenvolvimento por palavra-chave (AC 6 — não é mais o caminho de produção)
-        elif simular_erro_tool:
-            # P3 / AC 3: Erro de API/tool aciona abrir_transbordo sem inventar dado
-            logger.warning("Simulação de erro na integração. Acionando transbordo amigável.")
+        elif simular_erro_tool or llm_falhou_configurado:
+            # P3 / AC 3: LLM configurado mas a chamada falhou (erro de API, timeout, modelo sem
+            # suporte a tool use) aciona abrir_transbordo sem inventar dado — nunca cai no
+            # keyword-match abaixo, que é só para quando não há LLM configurado (AC 6).
+            if llm_falhou_configurado:
+                logger.warning("LLM configurado mas chamada falhou (ver log de erro acima). Acionando transbordo amigável.")
+            else:
+                logger.warning("Simulação de erro na integração. Acionando transbordo amigável.")
             res_transbordo = tools_registry.executar_tool("abrir_transbordo", {"motivo": "Erro/timeout na API de produtos", "criticidade": "media"}, ctx_exec)
             tools_executadas.append("abrir_transbordo")
             transbordo_acionado = True
             texto_resposta = "Não consegui verificar os dados no sistema neste momento. Vou confirmar com nossa equipe e um atendente continuará seu atendimento em breve."
-        elif "vestido" in texto_inbound.lower() or "produto" in texto_inbound.lower() or "casamento" in texto_inbound.lower():
+        # Sem LLM configurado (sem OPENROUTER_API_KEY): fallback determinístico de desenvolvimento
+        # por palavra-chave (AC 6 — nunca é o caminho de produção, só existe para testar sem chave)
+        elif not llm_configurado and (
+            "vestido" in texto_inbound.lower() or "produto" in texto_inbound.lower() or "casamento" in texto_inbound.lower()
+        ):
             # Executa a tool buscar_produtos
             res_busca = tools_registry.executar_tool("buscar_produtos", {"evento": "casamento", "tamanho": "42"}, ctx_exec)
             tools_executadas.append("buscar_produtos")
