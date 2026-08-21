@@ -58,7 +58,7 @@ class StatusTransitionService:
         lead_service: Any = None,
         now: datetime | None = None,
     ) -> tuple[bool, str]:
-        simulated_now = now or datetime.now()
+        simulated_now = now or datetime.now(timezone.utc)
         status_atual = lead.status
 
         # 1. MV1: A IA nunca move para ganho. Apenas o humano marca contrato fechado (PRD §9.7, AC 2, T10)
@@ -70,7 +70,7 @@ class StatusTransitionService:
         # 2. MV3: Se humano moveu nas últimas 24h, a IA não sobrescreve — registra divergência (PRD §9.7, AC 4, T11)
         status_alterado_por = getattr(lead, "status_alterado_por", None) or "sistema"
         status_alterado_em = getattr(lead, "status_alterado_em", None) or lead.criado_em
-        if autor == "ia" and status_alterado_por in ("atendente", "humano"):
+        if autor in ("ia", "sistema") and status_alterado_por in ("atendente", "humano"):
             if (_aware(simulated_now) - _aware(status_alterado_em)) < timedelta(hours=24):
                 msg_erro = "MV3: Alteração bloqueada. Um atendente humano movimentou este lead nas últimas 24h."
                 logger.warning(f"[REJEITADO MV3] {msg_erro} [lead_id={lead.id}, status_humano={status_atual}]")

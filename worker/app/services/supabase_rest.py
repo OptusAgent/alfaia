@@ -186,6 +186,7 @@ class SupabaseRestService:
         status_alterado_por: str,
         status_alterado_em: str,
         motivo_descarte: str | None = None,
+        followup_tentativas: int | None = None,
     ) -> None:
         """Persiste a transição de status decidida por `status_transition_service` de volta no
         Postgres — sem isso, a mutação em memória de `LeadDTO.status` nunca sobrevive ao fim da
@@ -197,6 +198,8 @@ class SupabaseRestService:
         }
         if motivo_descarte is not None:
             payload["motivo_descarte"] = motivo_descarte
+        if followup_tentativas is not None:
+            payload["followup_tentativas"] = followup_tentativas
         res = await self._request(
             "PATCH",
             f"leads?id=eq.{quote(lead_id, safe='')}",
@@ -205,6 +208,27 @@ class SupabaseRestService:
         )
         if not res or res.status_code >= 300:
             logger.warning("Nao foi possivel persistir status do lead: %s", res.text[:300] if res else "sem resposta")
+
+    async def listar_leads_para_followup(self, tenant_id: str) -> list[dict[str, Any]]:
+        """
+        Lê os leads candidatos ao job de silêncio/follow-up (story 6.7, AC 1, 3, 6) — mesmo
+        conjunto de status coberto pelo índice parcial `leads_followup`. As janelas de tempo
+        (24h geral, 78h específica de `orcamento`) são aplicadas em Python por
+        `followup_worker_service`, não aqui, porque cada status tem uma janela diferente.
+        """
+        res = await self._request(
+            "GET",
+            (
+                "leads?select=id,tenant_id,contato_id,status,followup_tentativas,"
+                "status_alterado_em,status_alterado_por,ultimo_contato_em,criado_em"
+                f"&tenant_id=eq.{quote(tenant_id, safe='')}"
+                "&status=in.(orcamento,qualificando,negociando,follow_up)"
+            ),
+        )
+        if not res or res.status_code >= 300:
+            logger.warning("Nao foi possivel listar leads para followup: %s", res.text[:300] if res else "sem resposta")
+            return []
+        return res.json()
 
     async def registrar_lead_evento(
         self,

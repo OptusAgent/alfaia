@@ -82,7 +82,7 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
         async def buscar_lead(self, lead_id):
             return None
 
-        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None):
+        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None, followup_tentativas=None):
             calls["status_lead_atualizado"] = {"lead_id": lead_id, "status": status}
 
         async def registrar_lead_evento(self, **kwargs):
@@ -224,7 +224,7 @@ async def test_webhook_persiste_mudanca_de_status_do_lead_no_postgres(monkeypatc
             calls["lead_buscado"] = lead_id
             return {"id": lead_id, "status": "qualificando"}
 
-        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None):
+        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None, followup_tentativas=None):
             calls["status_atualizado"] = {"lead_id": lead_id, "status": status, "status_alterado_por": status_alterado_por}
 
         async def registrar_lead_evento(self, **kwargs):
@@ -319,7 +319,7 @@ async def test_webhook_classificador_move_status_sem_tool_call_explicita(monkeyp
         async def buscar_lead(self, lead_id):
             return {"id": lead_id, "status": "novo"}
 
-        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None):
+        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None, followup_tentativas=None):
             calls["status_atualizado"] = {"lead_id": lead_id, "status": status}
 
         async def registrar_lead_evento(self, **kwargs):
@@ -410,7 +410,7 @@ async def test_webhook_envia_midias_antes_do_texto_e_falha_parcial_nao_bloqueia(
         async def buscar_lead(self, lead_id):
             return None
 
-        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None):
+        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None, followup_tentativas=None):
             pass
 
         async def registrar_lead_evento(self, **kwargs):

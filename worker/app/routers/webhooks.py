@@ -278,6 +278,7 @@ async def _processar_payload_background(
         # IA) e propõe uma transição sozinho. `status_transition_service` continua validando
         # (MV1-MV5): se `agendar`/`mover_status` já mudou o status para algo mais adiante no funil
         # nesta mesma troca, uma sugestão "para trás" do classificador é rejeitada automaticamente.
+        zera_followup_tentativas = False
         if lead_id:
             status_destino, motivo_classificacao = status_classifier_service.classificar_transicao(
                 status_atual=lead_dto.status,
@@ -285,7 +286,12 @@ async def _processar_payload_background(
                 texto_resposta_ia=texto_resposta,
             )
             if status_destino:
-                status_transition_service.validar_e_mover_status(
+                # story 6.7, AC 5: lead que estava em follow_up e respondeu — zera o contador de
+                # tentativas do job de silêncio (worker/app/services/followup_worker_service.py),
+                # senão ele carrega tentativas de um ciclo de silêncio já encerrado para o próximo.
+                if lead_dto.status == "follow_up" and status_destino == "negociando":
+                    zera_followup_tentativas = True
+                sucesso_transicao, _ = status_transition_service.validar_e_mover_status(
                     tenant_id=payload.tenant_id,
                     lead=lead_dto,
                     status_destino=status_destino,
@@ -293,6 +299,8 @@ async def _processar_payload_background(
                     motivo=motivo_classificacao,
                     lead_service=None,
                 )
+                if sucesso_transicao and zera_followup_tentativas:
+                    lead_dto.followup_tentativas = 0
 
         # `mover_status`/`agendar` já podem ter mutado `lead_dto.status` em memória durante o
         # tool-calling (story 6.6) — persiste de volta no Postgres, senão a mudança nunca
@@ -305,6 +313,7 @@ async def _processar_payload_background(
                 status_alterado_por="ia",
                 status_alterado_em=agora_iso,
                 motivo_descarte=lead_dto.motivo_descarte if lead_dto.status == "descartado" else None,
+                followup_tentativas=0 if zera_followup_tentativas else None,
             )
             await supabase_rest_service.registrar_lead_evento(
                 tenant_id=payload.tenant_id,
