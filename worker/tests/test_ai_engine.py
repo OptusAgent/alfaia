@@ -57,6 +57,26 @@ def test_motor_substitui_menu_puro_por_pergunta_natural():
     assert sanitizado == "Me diga como prefere seguir e eu continuo por aqui."
 
 
+def test_motor_remove_markdown_de_imagem_da_resposta():
+    """
+    Regressão do achado real em produção (2026-08-21): a IA às vezes tenta "mostrar" a foto ela
+    mesma inserindo sintaxe markdown de imagem na resposta — o WhatsApp não renderiza isso, o
+    lead só vê um link quebrado. A foto já vai de verdade via enviar_midia; o texto nunca deveria
+    conter a URL/sintaxe de imagem.
+    """
+    raw_response = (
+        "Aqui estão os detalhes do Terno Linho Praia Champanhe (T-203):\n"
+        "![Terno Linho Praia Champanhe](https://irewoqkwywsapiiytdau.supabase.co/storage/v1/object/public/wl-mock-catalogo/TERNOMASCULINO002.jpg)\n"
+        "Gostou desse terno ou gostaria de ver mais opções?"
+    )
+    sanitizado = AIEngineService.sanitizar_resposta_ia(raw_response)
+
+    assert "![" not in sanitizado
+    assert "supabase.co" not in sanitizado
+    assert "Aqui estão os detalhes do Terno Linho Praia Champanhe (T-203)" in sanitizado
+    assert "Gostou desse terno ou gostaria de ver mais opções?" in sanitizado
+
+
 def test_motor_nunca_pede_cpf_ou_documento():
     """Testa sanitização para garantir que a IA nunca solicita CPF ou fotos de documento (AC 7, AC 19.2 item 8)."""
     raw_response = "Para confirmar seu agendamento, envie seu CPF e foto do documento."

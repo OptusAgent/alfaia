@@ -323,3 +323,69 @@ async def test_uazapi_instance_create_connect_and_webhook():
         # 3. Teste configurar webhook
         res_webhook = await adapter.configurar_webhook("instancia_loja_01", "https://api.alfaia.app/webhook/uazapi/token_gerado_456")
         assert res_webhook["status"] == "webhook_configured"
+
+
+@pytest.mark.asyncio
+async def test_uazapi_enviar_midia_retenta_em_falha_transitoria():
+    """
+    Regressão do achado real em produção (2026-08-21): uma falha transitória (timeout/exceção
+    sem status HTTP) na primeira tentativa fazia a mídia nunca ser enviada, sem retry nenhum.
+    Agora deve tentar de novo e ter sucesso na 2ª tentativa.
+    """
+    tentativas = {"n": 0}
+
+    async def mock_handler(request: httpx.Request):
+        if "/chat/presence" in str(request.url):
+            return httpx.Response(200, json={"status": "ok"})
+        tentativas["n"] += 1
+        if tentativas["n"] == 1:
+            raise httpx.TimeoutException("")
+        return httpx.Response(200, json={"id": "wamid.uazapi_media_retry"})
+
+    transport = httpx.MockTransport(mock_handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        adapter = UazapiAdapter(
+            base_url="https://api.uazapi.com",
+            instance_name="loja_centro",
+            token="token_uazapi_123",
+            delay_min_ms=0,
+            delay_max_ms=0,
+            httpx_client=client,
+        )
+        res = await adapter.enviar_midia(
+            to="85988124477",
+            url="https://example.com/foto.jpg",
+            tipo="image",
+            caption="Foto do terno",
+        )
+
+    assert res.sucesso is True
+    assert res.wa_message_id == "wamid.uazapi_media_retry"
+    assert tentativas["n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_uazapi_enviar_midia_nao_retenta_em_4xx():
+    """4xx é erro do payload/contrato — não se resolve tentando de novo (mesmo padrão do cliente WL)."""
+    tentativas = {"n": 0}
+
+    async def mock_handler(request: httpx.Request):
+        if "/chat/presence" in str(request.url):
+            return httpx.Response(200, json={"status": "ok"})
+        tentativas["n"] += 1
+        return httpx.Response(400, text='{"error":"bad request"}')
+
+    transport = httpx.MockTransport(mock_handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        adapter = UazapiAdapter(
+            base_url="https://api.uazapi.com",
+            instance_name="loja_centro",
+            token="token_uazapi_123",
+            delay_min_ms=0,
+            delay_max_ms=0,
+            httpx_client=client,
+        )
+        res = await adapter.enviar_midia(to="85988124477", url="https://example.com/foto.jpg", tipo="image")
+
+    assert res.sucesso is False
+    assert tentativas["n"] == 1

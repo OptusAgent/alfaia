@@ -118,3 +118,16 @@ def test_wl_mock_tamanho_filtra_por_estoque_real():
     mock = WLMockAdapter()
     resultado = mock.buscar_produtos({"categoria": "terno", "tamanho": "38"})
     assert resultado == []
+
+
+def test_wl_mock_filtra_por_q_codigo_especifico():
+    """
+    Regressão do achado real em produção (2026-08-21): o lead disse "sim o T-203" depois de ver
+    a lista de ternos, mas o mock ignorava o filtro `q` e devolvia o grupo inteiro de novo,
+    fazendo a IA reenviar todas as fotos em vez de confirmar só a peça mencionada.
+    """
+    mock = WLMockAdapter()
+    resultado = mock.buscar_produtos({"evento": "casamento", "categoria": "terno", "q": "T-203"})
+    assert len(resultado) == 1
+    assert resultado[0].ref == "T-203"
+    assert resultado[0].nome == "Terno Linho Praia Champanhe"

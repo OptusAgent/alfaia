@@ -130,6 +130,11 @@ class WLMockAdapter:
         categoria_in = str(params.get("categoria") or "").strip().lower()
         cor_in = str(params.get("cor") or "").strip().lower()
         tamanho_in = str(params.get("tamanho") or "").strip()
+        # Busca livre (`q`) ignorada até aqui — quando o lead menciona um código/nome específico
+        # já visto (ex.: "sim o T-203"), a IA manda esse termo em `q`, mas sem filtrar por ele o
+        # mock devolvia o mesmo grupo inteiro de novo, parecendo repetir a lista (achado real em
+        # produção, 2026-08-21).
+        q_in = str(params.get("q") or "").strip().lower()
 
         segmentos_alvo = _SINONIMOS_CATEGORIA.get(categoria_in) if categoria_in else None
 
@@ -142,6 +147,8 @@ class WLMockAdapter:
             if cor_in and cor_in not in item["cor"].lower():
                 continue
             if tamanho_in and tamanho_in not in item["tamanhos"]:
+                continue
+            if q_in and q_in not in item["ref"].lower() and q_in not in item["nome"].lower():
                 continue
             encontrados.append(
                 WLProdutoDTO(

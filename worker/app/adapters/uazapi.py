@@ -421,21 +421,31 @@ class UazapiAdapter:
             "text": caption or "",
         }
 
-        try:
-            if self._client:
-                res = await self._client.post(endpoint, json=payload, headers=headers)
-            else:
-                async with httpx.AsyncClient() as client:
-                    res = await client.post(endpoint, json=payload, headers=headers)
+        # Timeout explícito + 1 retentativa: achado real em produção (2026-08-21) — sem timeout
+        # próprio, uma chamada ocasionalmente falhava com exceção "vazia" (timeout default do
+        # httpx) e a foto simplesmente não ia, sem outro sinal de erro. Mesmo espírito do retry
+        # em 5xx/timeout já usado no cliente da WebLocação (`weblocacao_service._chamar_api_real`).
+        ultimo_erro = ""
+        for tentativa in range(2):
+            try:
+                if self._client:
+                    res = await self._client.post(endpoint, json=payload, headers=headers, timeout=15.0)
+                else:
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        res = await client.post(endpoint, json=payload, headers=headers)
 
-            if res.status_code in (200, 201):
-                res_data = res.json()
-                wa_id = res_data.get("id") or res_data.get("wa_message_id") or f"uazapi_media_{clean_phone}"
-                return ResultadoEnvio(sucesso=True, wa_message_id=wa_id)
-            else:
-                return ResultadoEnvio(sucesso=False, erro=f"HTTP {res.status_code}: {res.text}")
-        except Exception as e:
-            return ResultadoEnvio(sucesso=False, erro=str(e))
+                if res.status_code in (200, 201):
+                    res_data = res.json()
+                    wa_id = res_data.get("id") or res_data.get("wa_message_id") or f"uazapi_media_{clean_phone}"
+                    return ResultadoEnvio(sucesso=True, wa_message_id=wa_id)
+                if res.status_code < 500:
+                    # 4xx não se resolve tentando de novo (mesmo padrão do cliente WL)
+                    return ResultadoEnvio(sucesso=False, erro=f"HTTP {res.status_code}: {res.text}")
+                ultimo_erro = f"HTTP {res.status_code}: {res.text}"
+            except Exception as e:
+                ultimo_erro = str(e) or e.__class__.__name__
+
+        return ResultadoEnvio(sucesso=False, erro=ultimo_erro)
 
     async def enviar_template(
         self, to: str, nome: str, idioma: str, componentes: list[dict[str, Any]]

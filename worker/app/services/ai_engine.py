@@ -20,6 +20,13 @@ NUMERIC_MENU_PATTERN = re.compile(
 MENU_INVITE_PATTERN = re.compile(r"(?:escolha\s+(?:uma\s+)?op[cç][aã]o|digite\s+\d+|responda\s+com\s+\d+)", re.IGNORECASE)
 MENU_LINE_PATTERN = re.compile(r"(?im)^\s*(?:[-*•]\s+|\d+[\.)]\s+|[1-9]\ufe0f?\u20e3\s*).+$")
 SENSITIVE_DATA_PATTERN = re.compile(r"\b(cpf|rg|comprovante|foto\s+do\s+documento|dados\s+bancários)\b", re.IGNORECASE)
+# Story 4.9, follow-up: a IA às vezes tenta "mostrar" a foto ela mesma, inserindo sintaxe markdown
+# de imagem/link na resposta (ex.: "![Terno](https://...)") — como o WhatsApp não renderiza isso,
+# o lead só vê um link quebrado. As fotos já são enviadas de verdade via enviar_midia; a instrução
+# de prompt cobre a maioria dos casos, mas isto é a garantia dura (P3-style, nunca confiar só na
+# instrução do prompt para algo que o sistema já resolve por código).
+MARKDOWN_IMAGE_PATTERN = re.compile(r"!?\[[^\]\n]*\]\(https?://[^\)\s]+\)")
+BARE_IMAGE_URL_PATTERN = re.compile(r"https?://\S+\.(?:jpe?g|png|gif|webp)\b", re.IGNORECASE)
 EXCESS_EMOJI_PATTERN = re.compile(r"[\U0001F300-\U0001FAFF]{2,}")
 EVENTO_PATTERN = re.compile(r"\b(casamento|formatura|anivers[aá]rio|baile|ensaio|evento corporativo|madrinha|noiva|padrinho|convidad[ao])\b", re.IGNORECASE)
 PECA_PATTERN = re.compile(
@@ -89,6 +96,13 @@ class AIEngineService:
         if EXCESS_EMOJI_PATTERN.search(texto):
             logger.warning("Sanitização: Emojis em excesso removidos da resposta da IA.")
             texto = EXCESS_EMOJI_PATTERN.sub("", texto).strip()
+
+        if MARKDOWN_IMAGE_PATTERN.search(texto) or BARE_IMAGE_URL_PATTERN.search(texto):
+            logger.warning("Sanitização: Link/markdown de imagem removido da resposta da IA (a foto já vai separada).")
+            texto = MARKDOWN_IMAGE_PATTERN.sub("", texto)
+            texto = BARE_IMAGE_URL_PATTERN.sub("", texto)
+            texto = re.sub(r"\n{3,}", "\n\n", texto)
+            texto = re.sub(r"[ \t]+\n", "\n", texto).strip()
 
         return texto
 

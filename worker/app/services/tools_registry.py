@@ -77,7 +77,12 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "apresentar um produto retornado, sempre mencione nome, código (campo `ref`), cor, "
         "tamanhos disponíveis e valor reais do resultado — as fotos já são enviadas "
         "separadamente pelo sistema, então não diga que está enviando imagem, apenas descreva o "
-        "produto e pergunte se o lead gostou."
+        "produto e pergunte se o lead gostou. NUNCA escreva a URL da imagem nem sintaxe de link/"
+        "imagem (como ![]() ou [texto](url)) na resposta — o lead recebe a foto direto no "
+        "WhatsApp, escrever a URL no texto só aparece como link quebrado para ele. Se o lead já "
+        "mencionar um código específico (ex.: 'T-203') que você já mostrou antes, chame "
+        "buscar_produtos de novo passando esse código em `q` para confirmar os dados reais dele — "
+        "não repita a lista inteira de opções."
     ),
     "consultar_slots": (
         "Consulta horários livres reais para agendamento (prova, retirada, ajuste) num período. "
