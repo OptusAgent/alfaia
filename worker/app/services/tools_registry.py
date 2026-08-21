@@ -73,7 +73,10 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "buscar_produtos": (
         "Busca peças disponíveis no catálogo real da WebLocação por evento, estilo, categoria, "
         "cor, tamanho e período. Chame antes de dizer que uma peça está disponível ou de citar "
-        "um valor — nunca inventar disponibilidade ou preço sem o resultado desta tool."
+        "um valor — nunca inventar disponibilidade ou preço sem o resultado desta tool. Ao "
+        "apresentar um produto retornado, sempre mencione nome, cor, tamanho e valor reais do "
+        "resultado — as fotos já são enviadas separadamente pelo sistema, então não diga que "
+        "está enviando imagem, apenas descreva o produto e pergunte se o lead gostou."
     ),
     "consultar_slots": (
         "Consulta horários livres reais para agendamento (prova, retirada, ajuste) num período. "

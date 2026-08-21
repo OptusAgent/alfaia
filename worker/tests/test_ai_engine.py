@@ -227,6 +227,7 @@ def test_motor_loop_de_tool_calling_respeita_limite_de_iteracoes():
         temperatura=0.3,
         ctx_exec={"tenant_id": "t1", "lead": lead, "lead_service": None, "conversa": {"estado": "ia"}},
         tools_executadas=[],
+        midias_sugeridas=[],
     )
 
     assert transbordo is True
@@ -262,6 +263,7 @@ def test_motor_loop_reserva_ultima_iteracao_para_resposta_final_sem_tools():
         temperatura=0.3,
         ctx_exec={"tenant_id": "t1", "lead": lead, "lead_service": None, "conversa": {"estado": "ia"}},
         tools_executadas=[],
+        midias_sugeridas=[],
     )
 
     assert transbordo is False
@@ -392,3 +394,110 @@ def test_tool_agendar_usa_nome_e_telefone_reais_do_contato():
     assert resultado["sucesso"] is True
     assert resultado["agendamento"]["cliente_nome"] == "Valmir Moreira Junior"
     assert resultado["agendamento"]["cliente_telefone"] == "558591733321"
+
+
+def test_motor_monta_midias_reais_apos_buscar_produtos_com_sucesso():
+    """
+    Story 4.9, AC 1, 2, 6: quando buscar_produtos retorna produtos reais com imagem, o motor
+    monta midias_sugeridas com url/legenda vindos do resultado real da tool (nome, cor, tamanho,
+    valor) — nunca inventados.
+    """
+    chamadas = {"n": 0}
+
+    class FakeLLMComBuscaProdutos:
+        def gerar_resposta(self, **kwargs):
+            chamadas["n"] += 1
+            if chamadas["n"] == 1:
+                return LLMRespostaDTO(
+                    content=None,
+                    tool_calls=[LLMToolCallDTO(id="call_1", nome="buscar_produtos", argumentos={"evento": "casamento"})],
+                )
+            return LLMRespostaDTO(content="Temos duas opções lindas para o seu casamento.")
+
+    engine = AIEngineService(llm_client=FakeLLMComBuscaProdutos())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="primeiro_contato",
+        mensagens_inbound=["Quero um vestido para casamento"],
+    )
+
+    assert res.transbordo_acionado is False
+    assert len(res.midias_sugeridas) == 2
+    primeira = res.midias_sugeridas[0]
+    assert primeira.url.startswith("https://")
+    assert "Champanhe" in primeira.legenda
+    assert "42" in primeira.legenda
+    assert "520" in primeira.legenda
+
+
+def test_motor_respeita_limite_de_midias_por_troca():
+    """Story 4.9, AC 1: no máximo MAX_MIDIAS_POR_TROCA imagens, mesmo com mais produtos retornados."""
+    produtos_fake = [
+        {"nome": f"Terno {i}", "cor": "Azul", "tamanho": "48", "valor_aluguel": 400.0, "imagem": f"https://x/{i}.jpg"}
+        for i in range(5)
+    ]
+
+    chamadas = {"n": 0}
+
+    class FakeLLMComMuitosProdutos:
+        def gerar_resposta(self, **kwargs):
+            chamadas["n"] += 1
+            if chamadas["n"] == 1:
+                return LLMRespostaDTO(
+                    content=None,
+                    tool_calls=[LLMToolCallDTO(id="call_1", nome="buscar_produtos", argumentos={"evento": "casamento"})],
+                )
+            return LLMRespostaDTO(content="Temos várias opções para o seu casamento.")
+
+    engine = AIEngineService(llm_client=FakeLLMComMuitosProdutos())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    import app.services.ai_engine as ai_engine_module
+
+    original_executar_tool = ai_engine_module.tools_registry.executar_tool
+
+    def fake_executar_tool(nome, argumentos, ctx):
+        if nome == "buscar_produtos":
+            return {"sucesso": True, "produtos": produtos_fake, "quantidade": len(produtos_fake)}
+        return original_executar_tool(nome, argumentos, ctx)
+
+    ai_engine_module.tools_registry.executar_tool = fake_executar_tool
+    try:
+        res = engine.processar_atendimento(
+            tenant_id="t1",
+            contato_dto=contato,
+            lead_dto=lead,
+            tipo_entrada="primeiro_contato",
+            mensagens_inbound=["Quero ver ternos para casamento"],
+        )
+    finally:
+        ai_engine_module.tools_registry.executar_tool = original_executar_tool
+
+    assert len(res.midias_sugeridas) == AIEngineService.MAX_MIDIAS_POR_TROCA
+
+
+def test_motor_nao_sugere_midia_sem_buscar_produtos_na_troca():
+    """Story 4.9, AC 7: sem chamada real a buscar_produtos nesta troca, nenhuma mídia é sugerida."""
+    class FakeLLMSoTexto:
+        def gerar_resposta(self, **kwargs):
+            return LLMRespostaDTO(content="Claro, me conta mais sobre o evento.")
+
+    engine = AIEngineService(llm_client=FakeLLMSoTexto())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="primeiro_contato",
+        mensagens_inbound=["Oi"],
+    )
+
+    assert res.midias_sugeridas == []

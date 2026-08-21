@@ -246,6 +246,40 @@ async def _processar_payload_background(
         texto_resposta = res_ia.texto_resposta
         logger.info(f"Resposta IA gerada para {telefone}: '{texto_resposta}'")
 
+        # 2.5. Envia as imagens reais dos produtos encontrados ANTES do texto (story 4.9, AC 1, 3)
+        # — ordem natural de catálogo: mostrar a foto, depois perguntar/confirmar em texto. Falha
+        # em uma mídia não bloqueia as demais nem o texto final (AC 5, é falha de canal, não de dado).
+        for midia in res_ia.midias_sugeridas:
+            try:
+                res_midia = await adapter.enviar_midia(to=telefone, url=midia.url, tipo="image", caption=midia.legenda)
+            except Exception as e:
+                logger.warning(f"Falha ao enviar mídia de produto para {telefone}: {e}")
+                continue
+
+            if not res_midia.sucesso:
+                logger.warning(f"Envio de mídia de produto falhou para {telefone}: {res_midia.erro}")
+                continue
+
+            await supabase_rest_service.registrar_mensagem(
+                {
+                    "tenant_id": payload.tenant_id,
+                    "canal_id": payload.canal_id,
+                    "conversa_id": conversa_id,
+                    "lead_id": lead_id,
+                    "wa_message_id": res_midia.wa_message_id,
+                    "remetente": "ia",
+                    "texto": midia.legenda,
+                    "payload": {"provider": "uazapi", "res_envio": res_midia.model_dump()},
+                    "enviado_em": datetime_from_timestamp(None),
+                    "de_mim": True,
+                    "telefone": telefone,
+                    "conteudo": midia.legenda,
+                    "midia_url": midia.url,
+                    "midia_tipo": "image",
+                    "status": "enviado",
+                }
+            )
+
         # 3. Dispara a resposta de volta no WhatsApp do cliente via UAZAPI (sem delay perceptível)
         if texto_resposta:
             res_envio = await adapter.enviar_texto(to=telefone, text=texto_resposta)

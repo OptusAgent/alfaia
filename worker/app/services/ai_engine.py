@@ -31,11 +31,20 @@ PECA_PATTERN = re.compile(
 DATA_PATTERN = re.compile(r"\b(?:dia\s+)?(\d{1,2}\s+de\s+[a-zç]+|\d{1,2}/\d{1,2}(?:/\d{2,4})?)\b", re.IGNORECASE)
 
 
+class MidiaEnvioDTO(BaseModel):
+    """Uma mídia real a enviar ao lead (story 4.9) — url/legenda sempre vindos do resultado
+    real de `buscar_produtos` executada nesta troca, nunca inventados ou reaproveitados de
+    outro turno (P3)."""
+    url: str
+    legenda: str
+
+
 class AIResponseDTO(BaseModel):
     texto_resposta: str
     tools_executadas: list[str] = []
     transbordo_acionado: bool = False
     status_lead_resultante: str = "novo"
+    midias_sugeridas: list[MidiaEnvioDTO] = []
 
 
 class AIEngineService:
@@ -47,6 +56,10 @@ class AIEngineService:
     # de arriscar travar a conversa num loop (story 4.8, AC 3). Valor de implementação, sem
     # significado de produto — @architect pode ajustar no gate se achar pouco/muito.
     MAX_TOOL_CALL_ITERATIONS = 4
+
+    # Máximo de imagens de produto enviadas por troca (story 4.9, AC 1) — evita flood no
+    # WhatsApp. Valor de implementação, sem significado de produto documentado no PRD.
+    MAX_MIDIAS_POR_TROCA = 3
 
     def __init__(self, llm_client: OpenRouterClient | None = None):
         self.llm_client = llm_client or openrouter_client
@@ -145,6 +158,7 @@ class AIEngineService:
         temperatura: float,
         ctx_exec: dict[str, Any],
         tools_executadas: list[str],
+        midias_sugeridas: list[MidiaEnvioDTO],
     ) -> tuple[str | None, bool]:
         """
         Loop real de function-calling (story 4.8, AC 2, AC 3): chama o LLM com as 8 tools de
@@ -152,6 +166,10 @@ class AIEngineService:
         resultado como mensagem de papel `tool` e chama de novo — até resposta só-texto ou
         `MAX_TOOL_CALL_ITERATIONS`. Nunca deixa o modelo formular a resposta final antes do
         resultado real da tool estar na conversa (P3, I5).
+
+        `midias_sugeridas` é preenchida in-place sempre que `buscar_produtos` retornar produtos
+        reais com imagem — a chamada mais recente substitui a anterior, nunca acumula entre
+        buscas diferentes na mesma troca (story 4.9, AC 1, AC 7).
 
         Retorna `(texto_final, transbordo_acionado)`. `texto_final is None` significa "sem
         resposta do LLM" (API não configurada/falhou) — o chamador cai no mesmo fallback
@@ -223,6 +241,26 @@ class AIEngineService:
                         True,
                     )
 
+                if tc.nome == "buscar_produtos":
+                    # Substitui (não acumula) — a busca mais recente é a que vale para esta
+                    # troca; nunca reaproveita imagem de uma busca anterior (P3, AC 7).
+                    midias_sugeridas.clear()
+                    for produto in resultado.get("produtos", []):
+                        if len(midias_sugeridas) >= self.MAX_MIDIAS_POR_TROCA:
+                            break
+                        imagem = produto.get("imagem")
+                        if not imagem:
+                            continue
+                        detalhes = [
+                            str(produto.get("nome", "")),
+                            str(produto.get("cor", "")),
+                            f"tamanho {produto['tamanho']}" if produto.get("tamanho") else "",
+                        ]
+                        legenda = " — ".join(d for d in detalhes if d)
+                        if produto.get("valor_aluguel") is not None:
+                            legenda += f" — R$ {produto['valor_aluguel']:.2f}"
+                        midias_sugeridas.append(MidiaEnvioDTO(url=imagem, legenda=legenda))
+
                 mensagens.append(
                     {
                         "role": "tool",
@@ -273,6 +311,7 @@ class AIEngineService:
         # 3. Execução das intenções do lead e invocação de ferramentas (PRD §8.2, P3)
         tools_executadas = []
         transbordo_acionado = False
+        midias_sugeridas: list[MidiaEnvioDTO] = []
         texto_inbound = " ".join(mensagens_inbound).strip()
 
         ctx_exec = {
@@ -323,6 +362,7 @@ class AIEngineService:
                 temperatura=temperatura,
                 ctx_exec=ctx_exec,
                 tools_executadas=tools_executadas,
+                midias_sugeridas=midias_sugeridas,
             )
             if transbordo_do_loop:
                 transbordo_acionado = True
@@ -380,6 +420,9 @@ class AIEngineService:
             tools_executadas=tools_executadas,
             transbordo_acionado=transbordo_acionado,
             status_lead_resultante=lead_dto.status,
+            # Nunca envia mídia quando a troca acionou transbordo — a oferta não se confirmou
+            # de fato (P3, mesmo espírito da AC 5 da 4.8: falha não vira resposta "quase certa").
+            midias_sugeridas=[] if transbordo_acionado else midias_sugeridas,
         )
 
 
