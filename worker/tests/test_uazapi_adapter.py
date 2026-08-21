@@ -261,9 +261,10 @@ async def test_uazapi_enviar_midia_headers():
         assert request.headers["apikey"] == "token_uazapi_123"
         body = json.loads(request.content.decode("utf-8"))
         # Nomes de campo confirmados empiricamente contra a API real da UAZAPI (2026-08-21) —
-        # não "mediaUrl"/"mediaType" como assumido originalmente na story 2.3.
+        # não "mediaUrl"/"mediaType"/"caption" como assumido originalmente na story 2.3.
         assert body["file"] == "https://example.com/foto.jpg"
         assert body["type"] == "image"
+        assert body["text"] == "Foto do vestido"
         return httpx.Response(200, json={"id": "wamid.uazapi_media_002"})
 
     transport = httpx.MockTransport(mock_handler)
