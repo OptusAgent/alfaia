@@ -1,3 +1,4 @@
+import json
 import pytest
 from app.services.ai_engine import AIEngineService
 from app.services.context_builder import ContatoDTO, LeadDTO
@@ -72,21 +73,22 @@ def test_motor_preserva_horarios_reais_mesmo_formatados_como_lista():
 
 def test_motor_preserva_lista_numerada_de_catalogo_com_codigo_real():
     """
-    Ajuste de produto (reversão, 2026-08-21): a lista numerada de catálogo (código real presente,
-    ex. "T-203") é a única lista numerada intencional — precisa sobreviver intacta à sanitização
-    de menu, diferente de um menu de ação fake ("1. Ver catálogo").
+    Ajuste de produto (reversão, 2026-08-21): a lista numerada de catálogo no formato mandado
+    ("N - cód. X - descrição — cor — tamanhos ...") é a única lista numerada intencional — precisa
+    sobreviver intacta à sanitização de menu, diferente de um menu de ação fake ("1. Ver catálogo").
     """
     raw_response = (
         "Encontrei essas opções de terno:\n"
-        "1. T-203 - Terno Linho Praia Champanhe - Champanhe - tamanhos: 40, 42, 44\n"
-        "2. T-201 - Terno Marinho Slim 3 Peças - Marinho - tamanhos: 42, 44, 46\n"
-        "Se gostou de alguma opção, digite o número ou o código do item para te enviar a imagem."
+        "1 - cód. T-203 - Terno Linho Praia Champanhe — Bege Claro — tamanhos 46, 48, 50\n"
+        "2 - cód. T-202 - Terno Areia Rústico 3 Peças — Bege Areia — tamanhos 46, 48, 52\n"
+        "Quer ver a imagem de qual dos itens acima? Digite o número do item ou o código. Se "
+        "quiser ver mais de um, separe por vírgula (ex.: 1,2) ou digite \"todos\"."
     )
     sanitizado = AIEngineService.sanitizar_resposta_ia(raw_response)
 
-    assert "1. T-203 - Terno Linho Praia Champanhe" in sanitizado
-    assert "2. T-201 - Terno Marinho Slim 3 Peças" in sanitizado
-    assert "digite o número ou o código do item" in sanitizado
+    assert "1 - cód. T-203 - Terno Linho Praia Champanhe" in sanitizado
+    assert "2 - cód. T-202 - Terno Areia Rústico 3 Peças" in sanitizado
+    assert "Digite o número do item ou o código" in sanitizado
 
 
 def test_motor_ainda_remove_lista_de_acao_sem_dado_real():
@@ -553,6 +555,110 @@ def test_motor_envia_midia_com_codigo_em_formato_diferente_do_mock():
 
     assert len(res.midias_sugeridas) == 1
     assert res.midias_sugeridas[0].url == "https://x/10234.jpg"
+
+
+def test_motor_acumula_midias_ao_selecionar_multiplos_itens():
+    """
+    Ajuste de seleção múltipla (2026-08-21): quando o lead escolhe mais de um item (ex.: "1,2"),
+    a IA chama buscar_produtos uma vez por item no mesmo turno — as mídias acumulam entre essas
+    chamadas (nunca "substitui", como antes), respeitando o teto de MAX_MIDIAS_POR_TROCA.
+    """
+    chamadas = {"n": 0}
+
+    class FakeLLMComDoisItens:
+        def gerar_resposta(self, **kwargs):
+            chamadas["n"] += 1
+            if chamadas["n"] == 1:
+                return LLMRespostaDTO(
+                    content=None,
+                    tool_calls=[
+                        LLMToolCallDTO(id="call_1", nome="buscar_produtos", argumentos={"q": "T-203"}),
+                        LLMToolCallDTO(id="call_2", nome="buscar_produtos", argumentos={"q": "T-202"}),
+                    ],
+                )
+            return LLMRespostaDTO(content="Aqui estão os dois. Gostou de algum?")
+
+    engine = AIEngineService(llm_client=FakeLLMComDoisItens())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="primeiro_contato",
+        mensagens_inbound=["Quero ver o 1 e o 2"],
+    )
+
+    assert res.transbordo_acionado is False
+    assert len(res.midias_sugeridas) == 2
+    todas_legendas = " | ".join(m.legenda for m in res.midias_sugeridas)
+    assert "T-203" in todas_legendas
+    assert "T-202" in todas_legendas
+
+
+def test_motor_marca_foto_nao_enviada_no_resultado_real_quando_atinge_o_teto():
+    """
+    Achado de revisão (2026-08-21): o teto de MAX_MIDIAS_POR_TROCA não pode truncar em silêncio —
+    o resultado real da tool que o próprio modelo lê precisa dizer `foto_enviada: false` para a
+    4ª seleção (além do teto de 3), senão o texto final pode afirmar que enviou uma foto que não
+    foi enviada (mesma classe de bug do `caption` vs `text` do enviar_midia).
+    """
+    produtos_fake = {
+        f"COD-{i}": {"nome": f"Terno {i}", "ref": f"COD-{i}", "cor": "Azul", "tamanho": "48", "imagem": f"https://x/{i}.jpg"}
+        for i in range(1, 5)
+    }
+    chamadas = {"n": 0}
+    mensagens_da_segunda_chamada = {}
+
+    class FakeLLMComQuatroItens:
+        def gerar_resposta(self, **kwargs):
+            chamadas["n"] += 1
+            if chamadas["n"] == 1:
+                return LLMRespostaDTO(
+                    content=None,
+                    tool_calls=[
+                        LLMToolCallDTO(id=f"call_{i}", nome="buscar_produtos", argumentos={"q": f"COD-{i}"})
+                        for i in range(1, 5)
+                    ],
+                )
+            mensagens_da_segunda_chamada.update({"mensagens": kwargs.get("mensagens")})
+            return LLMRespostaDTO(content="Aqui estão os itens que consegui te mostrar agora.")
+
+    engine = AIEngineService(llm_client=FakeLLMComQuatroItens())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    import app.services.ai_engine as ai_engine_module
+    original_executar_tool = ai_engine_module.tools_registry.executar_tool
+
+    def fake_executar_tool(nome, argumentos, ctx):
+        if nome == "buscar_produtos":
+            produto = produtos_fake[argumentos["q"]]
+            return {"sucesso": True, "produtos": [produto], "quantidade": 1}
+        return original_executar_tool(nome, argumentos, ctx)
+
+    ai_engine_module.tools_registry.executar_tool = fake_executar_tool
+    try:
+        res = engine.processar_atendimento(
+            tenant_id="t1",
+            contato_dto=contato,
+            lead_dto=lead,
+            tipo_entrada="primeiro_contato",
+            mensagens_inbound=["Quero ver os 4 itens"],
+        )
+    finally:
+        ai_engine_module.tools_registry.executar_tool = original_executar_tool
+
+    assert len(res.midias_sugeridas) == 3
+
+    resultados_tool = [
+        json.loads(m["content"]) for m in mensagens_da_segunda_chamada["mensagens"] if m.get("role") == "tool"
+    ]
+    assert sum(1 for r in resultados_tool if r.get("foto_enviada") is True) == 3
+    negados = [r for r in resultados_tool if r.get("foto_enviada") is False]
+    assert len(negados) == 1
+    assert "motivo_sem_foto" in negados[0]
 
 
 def test_motor_nao_envia_midia_quando_filtro_afunila_para_um_produto_sem_codigo():

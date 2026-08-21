@@ -26,18 +26,21 @@ MENU_LINE_PREFIXO_PATTERN = re.compile(r"^\s*(?:[-*•]\s+|\d+[\.)]\s+|[1-9]\ufe
 # linha de "menu" que contém horário ou valor é dado real (P3) e precisa sobreviver, só sem o
 # bullet/número — vira frase corrida em vez de lista.
 DADO_REAL_EM_LINHA_PATTERN = re.compile(r"\d{1,2}[:h]\d{2}\b|R\$\s?\d", re.IGNORECASE)
-# Ajuste de produto (2026-08-21, reversão): a lista numerada de catálogo (uma linha por produto,
-# formato "N. <código> - <descrição> - <cor> - tamanhos: <...>", mandado pela tool_description de
-# buscar_produtos) é a ÚNICA lista numerada intencional que a IA deve emitir — precisa sobreviver
-# intacta à sanitização de menu (que existe para banir "escolha uma opção" fake), diferente de
-# listas de horário (essas continuam virando frase corrida). Ancorado na palavra "tamanhos:" do
-# formato mandado, não no formato do código do produto — o código real varia por provedor/adapter
-# (WL real pode devolver algo diferente do "X-999" do catálogo mock) e não pode ser a única âncora.
-LISTA_PRODUTOS_PATTERN = re.compile(r"(?im)^\s*\d+[\.)]\s+.*\btamanhos?\s*:")
+# Ajuste de produto (2026-08-21, reversão + refinamento de formato): a lista numerada de catálogo
+# (uma linha por produto, formato "N - cód. <código> - <descrição> — <cor> — tamanhos <...>",
+# mandado pela tool_description de buscar_produtos) é a ÚNICA lista numerada intencional que a IA
+# deve emitir — precisa sobreviver intacta à sanitização de menu (que existe para banir "escolha
+# uma opção" fake), diferente de listas de horário (essas continuam virando frase corrida).
+# Ancorado no literal "cód." OU na palavra "tamanhos" do formato mandado — nunca no formato do
+# código do produto em si, que varia por provedor/adapter (WL real pode devolver algo diferente do
+# "X-999" do catálogo mock).
+LISTA_PRODUTOS_PATTERN = re.compile(r"(?im)^\s*\d+\s*[\.)-]\s*.*(?:c[oó]d\.?\s|tamanhos?\s*:?\s*\d)")
 
 
 def _normalizar_codigo(valor: str) -> str:
     return re.sub(r"[^0-9a-z]", "", valor.casefold())
+
+
 SENSITIVE_DATA_PATTERN = re.compile(r"\b(cpf|rg|comprovante|foto\s+do\s+documento|dados\s+bancários)\b", re.IGNORECASE)
 # Story 4.9, follow-up: a IA às vezes tenta "mostrar" a foto ela mesma, inserindo sintaxe markdown
 # de imagem/link na resposta (ex.: "![Terno](https://...)") — como o WhatsApp não renderiza isso,
@@ -85,6 +88,11 @@ class AIEngineService:
     # de arriscar travar a conversa num loop (story 4.8, AC 3). Valor de implementação, sem
     # significado de produto — @architect pode ajustar no gate se achar pouco/muito.
     MAX_TOOL_CALL_ITERATIONS = 4
+
+    # Máximo de imagens de produto enviadas por troca (evita flood no WhatsApp quando o lead
+    # seleciona vários itens ou pede "todos") — reintroduzido no ajuste de seleção múltipla
+    # (2026-08-21); valor de implementação, sem significado de produto documentado no PRD.
+    MAX_MIDIAS_POR_TROCA = 3
 
     def __init__(self, llm_client: OpenRouterClient | None = None):
         self.llm_client = llm_client or openrouter_client
@@ -305,30 +313,49 @@ class AIEngineService:
                     )
 
                 if tc.nome == "buscar_produtos":
-                    # Substitui (não acumula) — a busca mais recente é a que vale para esta
-                    # troca; nunca reaproveita imagem de uma busca anterior (P3, AC 7).
-                    midias_sugeridas.clear()
-                    # Ajuste de produto (2026-08-21, reversão): foto só quando o lead apontou um
-                    # item específico da lista que a própria IA mostrou antes — nunca só porque a
-                    # busca por acaso afunilou para 1 resultado (uma busca de navegação comum,
-                    # ex.: cor+tamanho juntos, também pode devolver 1 produto só). O sinal real de
-                    # "item específico" é `q` bater com o código (`ref`) real do único produto
-                    # devolvido — não confiar no FORMATO do código (varia por provedor/adapter:
-                    # mock usa "T-203", a WL real pode devolver outra coisa), só na relação com o
-                    # dado real da tool (achado de revisão, 2026-08-21).
+                    # Ajuste de produto (2026-08-21, reversão + seleção múltipla): foto só quando o
+                    # lead apontou um item específico da lista que a própria IA mostrou antes —
+                    # nunca só porque a busca por acaso afunilou para 1 resultado (uma busca de
+                    # navegação comum, ex.: cor+tamanho juntos, também pode devolver 1 produto só).
+                    # O sinal real de "item específico" é `q` bater com o código (`ref`) real do
+                    # único produto devolvido — não confiar no FORMATO do código (varia por
+                    # provedor/adapter: mock usa "T-203", a WL real pode devolver outra coisa), só
+                    # na relação com o dado real da tool. Seleção de mais de 1 item vira uma
+                    # chamada desta tool por item (uma por código) no mesmo turno — ACUMULA entre
+                    # essas chamadas (nunca limpa a lista a cada nova busca), até o teto de
+                    # `MAX_MIDIAS_POR_TROCA`; buscas de navegação que não batem o gate simplesmente
+                    # não adicionam nada, sem apagar mídia já acumulada no mesmo turno.
+                    #
+                    # `foto_enviada`/`motivo_sem_foto` são adicionados ao MESMO resultado real que
+                    # o modelo lê de volta como tool result — nunca deixa o texto final "adivinhar"
+                    # quantas fotos foram de fato enviadas (achado de revisão, 2026-08-21: sem isso,
+                    # o modelo só vê `sucesso: true` em toda chamada e pode escrever "aqui estão as
+                    # 5" quando o teto cortou em 3, o mesmo tipo de falha do bug real de `caption`
+                    # vs `text` do enviar_midia — API aceita, texto afirma algo que não aconteceu).
                     produtos = resultado.get("produtos", [])
                     q_arg = str(tc.argumentos.get("q") or "").strip()
                     ref_unico = str(produtos[0].get("ref") or "").strip() if len(produtos) == 1 else ""
-                    if ref_unico and q_arg and _normalizar_codigo(q_arg) == _normalizar_codigo(ref_unico):
+                    eh_selecao_de_item = bool(
+                        ref_unico and q_arg and _normalizar_codigo(q_arg) == _normalizar_codigo(ref_unico)
+                    )
+                    if eh_selecao_de_item:
                         produto = produtos[0]
                         imagem = produto.get("imagem")
-                        if imagem:
+                        if not imagem:
+                            resultado = {**resultado, "foto_enviada": False, "motivo_sem_foto": "produto sem imagem cadastrada"}
+                        elif len(midias_sugeridas) >= self.MAX_MIDIAS_POR_TROCA:
+                            resultado = {
+                                **resultado,
+                                "foto_enviada": False,
+                                "motivo_sem_foto": f"limite de {self.MAX_MIDIAS_POR_TROCA} fotos por troca já atingido",
+                            }
+                        else:
                             tamanhos = produto.get("tamanhos_disponiveis") or (
                                 [produto["tamanho"]] if produto.get("tamanho") else []
                             )
                             detalhes = [
-                                str(produto.get("nome", "")),
                                 f"cód. {produto['ref']}" if produto.get("ref") else "",
+                                str(produto.get("nome", "")),
                                 str(produto.get("cor", "")),
                                 f"tamanhos {', '.join(tamanhos)}" if tamanhos else "",
                             ]
@@ -336,6 +363,7 @@ class AIEngineService:
                             # se perguntar explicitamente (ajuste de produto, 2026-08-21).
                             legenda = " — ".join(d for d in detalhes if d)
                             midias_sugeridas.append(MidiaEnvioDTO(url=imagem, legenda=legenda))
+                            resultado = {**resultado, "foto_enviada": True}
 
                 mensagens.append(
                     {
