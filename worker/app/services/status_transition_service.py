@@ -1,8 +1,14 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger("alfaia.status_transition")
+
+
+def _aware(dt: datetime) -> datetime:
+    """Normaliza para timezone-aware (UTC) — `status_alterado_em` pode vir naive (default de
+    teste/lead_service em memória) ou aware (hidratado de string ISO com offset do Postgres)."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 STATUS_ORDER = {
     "novo": 1,
@@ -65,7 +71,7 @@ class StatusTransitionService:
         status_alterado_por = getattr(lead, "status_alterado_por", None) or "sistema"
         status_alterado_em = getattr(lead, "status_alterado_em", None) or lead.criado_em
         if autor == "ia" and status_alterado_por in ("atendente", "humano"):
-            if (simulated_now - status_alterado_em) < timedelta(hours=24):
+            if (_aware(simulated_now) - _aware(status_alterado_em)) < timedelta(hours=24):
                 msg_erro = "MV3: Alteração bloqueada. Um atendente humano movimentou este lead nas últimas 24h."
                 logger.warning(f"[REJEITADO MV3] {msg_erro} [lead_id={lead.id}, status_humano={status_atual}]")
                 if lead_service:

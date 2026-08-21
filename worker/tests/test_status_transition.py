@@ -1,5 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytest
+from app.services.context_builder import LeadDTO
 from app.services.lead_service import LeadService, LeadModel
 from app.services.status_transition_service import StatusTransitionService
 
@@ -120,6 +121,37 @@ def test_mv5_descarte_sem_motivo_rejeitado():
     assert s2 is True
     assert lead.status == "descartado"
     assert lead.motivo_descarte == "já aluguei em outro lugar"
+
+
+def test_mv3_bloqueia_mesmo_com_status_alterado_em_aware_hidratado_do_postgres():
+    """
+    Regressão: `webhooks.py` hidrata `LeadDTO.status_alterado_em` a partir de uma string ISO
+    real do Postgres — Pydantic coage para datetime AWARE (com tzinfo). `simulated_now` (via
+    `datetime.now()` ou o default de teste) é NAIVE. Sem normalização, a subtração
+    `naive - aware` explode com TypeError bem no caso que a MV3 existe para proteger: um lead
+    que um humano acabou de mover.
+    """
+    now_aware = datetime.now(timezone.utc)
+    lead = LeadDTO(
+        id="lead_14",
+        tenant_id="tenant_piloto",
+        contato_id="cnt_14",
+        status="negociando",
+        status_alterado_por="humano",
+        status_alterado_em=(now_aware - timedelta(hours=3)).isoformat(),
+    )
+
+    sucesso, msg = StatusTransitionService.validar_e_mover_status(
+        tenant_id="tenant_piloto",
+        lead=lead,
+        status_destino="qualificando",
+        autor="ia",
+        now=datetime.now(),  # naive — como vem de `datetime.now()` em produção
+    )
+
+    assert sucesso is False
+    assert "MV3" in msg
+    assert lead.status == "negociando"
 
 
 def test_classificador_desistencia_explicita_vs_silencio():

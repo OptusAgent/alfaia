@@ -16,6 +16,8 @@ from app.adapters.uazapi import UazapiAdapter
 from app.services.ai_engine import ai_engine_service
 from app.services.context_builder import ContatoDTO, LeadDTO
 from app.services.supabase_rest import supabase_rest_service
+from app.services.status_classifier_service import status_classifier_service
+from app.services.status_transition_service import status_transition_service
 
 
 def _required_env(name: str) -> str:
@@ -270,6 +272,27 @@ async def _processar_payload_background(
         # Postgres, mesmo caminho já usado para o push_name do WhatsApp.
         if res_ia.contato_nome_atualizado and contato_id:
             await supabase_rest_service.atualizar_contato_nome(contato_id, res_ia.contato_nome_atualizado)
+
+        # Classificador determinístico de status (story 6.6, AC 2-4): NUNCA depende de o modelo
+        # decidir chamar `mover_status` — lê o texto real da troca (mensagem do lead + resposta da
+        # IA) e propõe uma transição sozinho. `status_transition_service` continua validando
+        # (MV1-MV5): se `agendar`/`mover_status` já mudou o status para algo mais adiante no funil
+        # nesta mesma troca, uma sugestão "para trás" do classificador é rejeitada automaticamente.
+        if lead_id:
+            status_destino, motivo_classificacao = status_classifier_service.classificar_transicao(
+                status_atual=lead_dto.status,
+                mensagens_lead=[mensagem_cliente],
+                texto_resposta_ia=texto_resposta,
+            )
+            if status_destino:
+                status_transition_service.validar_e_mover_status(
+                    tenant_id=payload.tenant_id,
+                    lead=lead_dto,
+                    status_destino=status_destino,
+                    autor="ia",
+                    motivo=motivo_classificacao,
+                    lead_service=None,
+                )
 
         # `mover_status`/`agendar` já podem ter mutado `lead_dto.status` em memória durante o
         # tool-calling (story 6.6) — persiste de volta no Postgres, senão a mudança nunca
