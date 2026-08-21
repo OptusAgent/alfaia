@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from pydantic import BaseModel, Field
 
@@ -45,23 +45,100 @@ class SchedulingService:
         # Repositório de agendamentos para verificação de idempotência I6
         self.agendamentos: list[AgendamentoModel] = []
 
+    # Máximo de dias corridos varridos ao procurar disponibilidade real (próximos dias ou
+    # alternativa mais próxima) — evita busca sem fim se uma agenda ficar fechada por muito tempo.
+    # Cada dia varrido é 1 chamada HTTP real (timeout 8s, retry 2x em 5xx — até ~24s no pior caso)
+    # ao adapter real da WebLocação; mantido baixo de propósito (achado de revisão, 2026-08-21) —
+    # o caso feliz encontra os 5 dias já na primeira semana (só domingo fecha), e um teto alto
+    # vira risco real de travar a resposta do webhook se a API da WL estiver degradada.
+    MAX_DIAS_BUSCA_DISPONIBILIDADE = 10
+
+    def _dias_com_vaga_real(
+        self, tenant_id: str, tipo: str, data_referencia: str, max_dias: int = 5
+    ) -> list[dict[str, Any]]:
+        """
+        Varre dia a dia a partir de `data_referencia` (inclusive) e devolve até `max_dias` dias
+        que têm pelo menos 1 horário real com vaga livre — nunca inventa disponibilidade: um dia
+        fechado (sem `horarios_funcionamento`) ou lotado (vagas_livres=0 em todos os horários)
+        simplesmente não entra na lista (achado real em produção, 2026-08-21: agendamento sem
+        nenhuma verificação de agenda real, data/hora efetivamente inventadas pelo modelo).
+        """
+        try:
+            base = datetime.strptime(data_referencia, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            base = datetime.now()
+
+        dias: list[dict[str, Any]] = []
+        for i in range(self.MAX_DIAS_BUSCA_DISPONIBILIDADE):
+            dia_str = (base + timedelta(days=i)).strftime("%Y-%m-%d")
+            try:
+                slots = weblocacao_service.consultar_slots(tenant_id=tenant_id, tipo=tipo, data_inicio=dia_str)
+            except Exception as e:
+                logger.warning(f"Falha ao consultar slots do dia {dia_str} na varredura de disponibilidade: {e}")
+                continue
+            livres = [s.hora for s in slots if s.vagas_livres > 0]
+            if livres:
+                dias.append({"data": dia_str, "horarios": livres})
+            if len(dias) >= max_dias:
+                break
+        return dias
+
     def consultar_slots(
         self,
         tenant_id: str = "tenant_piloto",
         tipo: str = "prova",
-        data_inicio: str = "2026-09-01",
+        data_inicio: str | None = None,
         data_fim: str | None = None,
     ) -> dict[str, Any]:
         """
-        Consulta vagas de atendimento em tempo real na WebLocação (AC 1).
+        Consulta vagas reais de atendimento na WebLocação (AC 1). Sem `data_inicio` (lead ainda
+        não tem preferência de dia), devolve os próximos dias reais com horário livre a partir de
+        hoje. Com `data_inicio` (lead propôs um dia), devolve os horários reais daquele dia — se
+        esse dia não tiver nenhum horário livre (fechado ou lotado), devolve os dias mais próximos
+        com vaga real em vez de inventar ou silenciosamente escolher uma data (ajuste de agenda,
+        2026-08-21, achado real: agendamento confirmado numa data/hora nunca verificada).
         """
         try:
+            if not data_inicio:
+                dias = self._dias_com_vaga_real(tenant_id, tipo, datetime.now().strftime("%Y-%m-%d"))
+                return {
+                    "sucesso": True,
+                    "slots": [],
+                    "dias_disponiveis": dias,
+                    "mensagem": (
+                        f"Próximos {len(dias)} dias com horário disponível para {tipo}."
+                        if dias
+                        else f"Não encontrei horário disponível para {tipo} nos próximos {self.MAX_DIAS_BUSCA_DISPONIBILIDADE} dias."
+                    ),
+                }
+
             slots = weblocacao_service.consultar_slots(tenant_id=tenant_id, tipo=tipo, data_inicio=data_inicio)
+            livres = [s for s in slots if s.vagas_livres > 0]
+            if livres:
+                return {
+                    "sucesso": True,
+                    "slots": [s.model_dump() for s in slots],
+                    "quantidade": len(livres),
+                    "data_pedida_disponivel": True,
+                    "mensagem": f"Encontramos {len(livres)} horários disponíveis para {tipo} em {_fmt_data_br(data_inicio)}.",
+                }
+
+            # Data pedida sem nenhuma vaga real (fechado ou lotado) — busca os dias mais próximos
+            # com disponibilidade real, começando pela própria data pedida (inclusive), nunca
+            # inventando nem escolhendo uma data sozinho.
+            dias_alternativos = self._dias_com_vaga_real(tenant_id, tipo, data_inicio)
             return {
                 "sucesso": True,
-                "slots": [s.model_dump() for s in slots],
-                "quantidade": len(slots),
-                "mensagem": f"Encontramos {len(slots)} horários disponíveis para {tipo} em {_fmt_data_br(data_inicio)}.",
+                "slots": [],
+                "quantidade": 0,
+                "data_pedida_disponivel": False,
+                "dias_disponiveis": dias_alternativos,
+                "mensagem": (
+                    f"Não há horário disponível para {tipo} em {_fmt_data_br(data_inicio)}. "
+                    f"Dia real mais próximo com vaga: {_fmt_data_br(dias_alternativos[0]['data'])}."
+                    if dias_alternativos
+                    else f"Não há horário disponível para {tipo} em {_fmt_data_br(data_inicio)} nem nos próximos dias pesquisados."
+                ),
             }
         except Exception as e:
             logger.error(f"Erro ao consultar slots WL: {e}")
@@ -132,10 +209,44 @@ class SchedulingService:
             logger.info(f"Agendamento idempotente retornado sem duplicar reserva no ERP [id={agendamento_existente.id}]")
             return {
                 "sucesso": True,
+                "agendado": True,
                 "idempotente": True,
                 "agendamento": agendamento_existente.model_dump(),
                 "mensagem": f"Seu agendamento para {_fmt_data_br(data)} às {hora} já está confirmado no sistema.",
             }
+
+        # 1.5 Verificação real de agenda (achado real em produção, 2026-08-21): `agendar` nunca
+        # confirmava se `data`/`hora` correspondiam a um horário real com vaga — o modelo podia
+        # (e chegou a) inventar uma data/hora sem nunca ter consultado `consultar_slots` na
+        # conversa. Aqui é a garantia dura (P3, mesmo padrão de outros "nunca confiar só na
+        # instrução de prompt"): revalida contra a agenda real no momento da escrita. Se não bater
+        # com um horário livre de verdade, NÃO cria o agendamento — devolve `sucesso: True` (não é
+        # falha de sistema, não aciona transbordo) com `agendado: False` e a data real mais
+        # próxima com vaga, para a IA reoferecer sem inventar nada.
+        try:
+            slots_do_dia = weblocacao_service.consultar_slots(tenant_id=tenant_id, tipo=tipo, data_inicio=data)
+        except Exception as e:
+            logger.warning(f"Falha ao revalidar agenda antes de agendar (nao bloqueante, segue sem validar): {e}")
+            slots_do_dia = None
+        if slots_do_dia is not None:
+            slot_valido = next((s for s in slots_do_dia if s.hora == hora and s.vagas_livres > 0), None)
+            if slot_valido is None:
+                dias_alternativos = self._dias_com_vaga_real(tenant_id, tipo, data)
+                proxima = dias_alternativos[0] if dias_alternativos else None
+                return {
+                    "sucesso": True,
+                    "agendado": False,
+                    "motivo": "horario_indisponivel",
+                    "dias_disponiveis": dias_alternativos,
+                    "mensagem": (
+                        f"O horário {hora} de {_fmt_data_br(data)} não está mais disponível para {tipo}. "
+                        + (
+                            f"O dia real mais próximo com vaga é {_fmt_data_br(proxima['data'])}, horários: {', '.join(proxima['horarios'])}."
+                            if proxima
+                            else "Não encontrei outro horário disponível nos próximos dias pesquisados."
+                        )
+                    ),
+                }
 
         # 2. Tratamento de falha de escrita com transbordo (AC 4, I2, P3)
         if simular_erro_api:
@@ -209,6 +320,7 @@ class SchedulingService:
             logger.info(f"Novo agendamento criado com sucesso [wl_id={res_wl.id}, local_id={novo_agendamento.id}]")
             return {
                 "sucesso": True,
+                "agendado": True,
                 "idempotente": False,
                 "agendamento": novo_agendamento.model_dump(),
                 "mensagem": f"Agendamento de {tipo} confirmado com sucesso para {_fmt_data_br(data)} às {hora}!",

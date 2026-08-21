@@ -20,7 +20,11 @@ class BuscarProdutosInput(BaseModel):
 
 class ConsultarSlotsInput(BaseModel):
     tipo: str = Field(..., description="Tipo de agendamento (ex: prova, retirada, ajuste)")
-    data_inicio: str = Field(..., description="Data início YYYY-MM-DD")
+    # Opcional de propósito (ajuste de agenda, 2026-08-21): quando o lead ainda não tem um dia em
+    # mente, chame sem `data_inicio` para receber os próximos dias reais com horário livre. Quando
+    # o lead já propôs um dia, passe `data_inicio` — se esse dia não tiver vaga real, a tool devolve
+    # os dias mais próximos que têm, nunca inventa nem escolhe uma data sozinha.
+    data_inicio: str | None = Field(None, description="Data proposta pelo lead YYYY-MM-DD, se houver")
     data_fim: str | None = Field(None, description="Data fim YYYY-MM-DD")
 
 
@@ -30,6 +34,14 @@ class AgendarInput(BaseModel):
     hora: str = Field(..., description="Horário do agendamento HH:MM")
     produto_ref: str | None = Field(None, description="Código ou referência da peça")
     observacao: str | None = Field(None, description="Observação adicional")
+    # Nome completo de quem vai comparecer, passado diretamente aqui (não só via atualizar_lead)
+    # para o agendamento nunca depender de uma chamada separada ter acontecido antes — achado real
+    # em produção (2026-08-21): a IA confirmou o nome em texto ("Obrigado, Valmir Junior!") mas
+    # nunca chamou atualizar_lead, e o agendamento foi gravado com o nome de exibição genérico do
+    # WhatsApp mesmo assim. Se omitido, usa o nome já confirmado no contato (se houver).
+    cliente_nome: str | None = Field(
+        None, description="Nome completo de quem vai comparecer, confirmado nesta conversa"
+    )
     # Telefone de quem vai efetivamente comparecer ao agendamento, quando for diferente do número
     # de WhatsApp que está enviando a mensagem (ex.: esposa agendando prova para o esposo, mãe
     # para filho/filha) — só preencher se o lead informar explicitamente. NUNCA usar este campo
@@ -120,38 +132,59 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "a foto direto no WhatsApp, a URL no texto só vira link quebrado."
     ),
     "consultar_slots": (
-        "Consulta horários livres reais para agendamento (prova, retirada, ajuste) num período. "
-        "Chame antes de oferecer qualquer horário ao lead — nunca inventar disponibilidade de "
-        "agenda. Ao apresentar os horários retornados, escreva em frase corrida, nunca em lista "
-        "com bullet/número/quebra de linha por horário (ex.: 'temos às 9h, 11h e 14h', nunca "
-        "'- 09:00\\n- 11:00\\n- 14:00') — uma lista quebrada em linhas é removida pela "
-        "sanitização de menu do sistema antes de chegar ao lead."
+        "Consulta a agenda REAL para agendamento (prova, retirada, ajuste) — nunca inventar "
+        "disponibilidade. FLUXO OBRIGATÓRIO:\n"
+        "1) Assim que o lead confirmar o item e topar agendar, e ele ainda não tiver dito um dia de "
+        "preferência, chame esta tool SEM `data_inicio` — ela devolve os próximos dias reais com "
+        "horário livre (campo `dias_disponiveis`, cada um com sua lista de horários). Apresente "
+        "isso ao lead numa frase natural e curta (ex.: 'Tenho vaga terça (25/08) às 9h ou 14h, e "
+        "quarta (26/08) às 10h — algum desses funciona? Ou me diga o dia e horário que prefere que "
+        "eu vejo se tem vaga'). NUNCA em lista com bullet/número/quebra de linha por dia — uma "
+        "lista quebrada em linhas sem o formato de catálogo de produto é removida pela sanitização "
+        "de menu do sistema antes de chegar ao lead.\n"
+        "2) Se o lead já disser um dia/horário de preferência (seja na primeira mensagem sobre "
+        "agendamento ou respondendo à sua oferta), chame esta tool COM `data_inicio` nesse dia. Se "
+        "`data_pedida_disponivel` vier `true`, confirme esse horário com o lead. Se vier `false`, o "
+        "dia pedido não tem vaga real (fechado ou lotado) — nunca insista nele nem invente um "
+        "horário parecido: diga isso com naturalidade e ofereça o dia mais próximo real que "
+        "aparece em `dias_disponiveis` (ex.: 'Nesse dia não tenho vaga, mas na quinta 27/08 tenho "
+        "às 11h — funciona?').\n"
+        "3) Só chame `agendar` depois que o lead confirmar um horário que veio de um resultado "
+        "REAL desta tool nesta mesma conversa — nunca por conta própria."
     ),
     "agendar": (
-        "Cria de fato um agendamento na WebLocação para o lead atual. Só chamar depois que o lead "
-        "confirmar um horário retornado por consultar_slots nesta mesma conversa E depois de já "
-        "ter, nesta conversa, o NOME COMPLETO e o TELEFONE de quem vai efetivamente comparecer — "
+        "Cria de fato um agendamento na WebLocação para o lead atual. Só chamar depois que (a) o "
+        "lead confirmou um horário retornado por consultar_slots nesta mesma conversa, e (b) você "
+        "já tem, nesta conversa, o NOME COMPLETO e o TELEFONE de quem vai efetivamente comparecer — "
         "pergunte sempre nessa ordem, um dado por mensagem: primeiro o nome completo, depois o "
         "telefone. Isso é obrigatório mesmo quando o lead já demonstrou interesse claro, porque "
         "quem está mandando mensagem pode estar agendando para outra pessoa (ex.: esposa marcando "
         "prova para o esposo, mãe para filho ou filha) — nunca assuma que o nome de exibição do "
         "WhatsApp (ex.: 'valmirmoreirajunior') ou o número que está conversando são os dados reais "
-        "de quem vai à prova. Assim que o lead informar o nome, chame atualizar_lead com "
-        "`nome_contato` preenchido. O telefone de quem vai comparecer (se diferente de quem está "
-        "conversando) vai direto no parâmetro `cliente_telefone` desta própria tool `agendar` — "
-        "nunca em atualizar_lead, e nunca troque o número que está recebendo esta conversa. Sempre "
-        "passe `produto_ref` quando o agendamento for para experimentar/retirar uma peça específica "
-        "já identificada na conversa. Na mensagem final de confirmação, informe a data completa com "
-        "dia, mês e ANO no formato dd/mm/aaaa (ex.: '22/08/2026', nunca '2026-08-22' nem só "
-        "'22/08') — é a única garantia real que o lead tem de que a data e o ano estão certos."
+        "de quem vai à prova. Passe o nome confirmado direto no parâmetro `cliente_nome` desta "
+        "própria tool (não basta ter dito o nome antes numa outra mensagem — mande aqui também), e "
+        "o telefone de quem vai comparecer (se diferente de quem está conversando) em "
+        "`cliente_telefone` — nunca troque o número que está recebendo esta conversa. O resultado "
+        "desta tool pode vir com `agendado: false`: se `motivo` for `nome_pendente`, use exatamente "
+        "a `mensagem` devolvida para pedir de novo (ela já diz se falta o nome inteiro ou só o "
+        "sobrenome — nunca repita a mesma pergunta genérica se o lead já tinha respondido algo, "
+        "senão a conversa trava em loop); se for `horario_indisponivel`, "
+        "o horário deixou de estar livre entre a consulta e agora — nunca diga que confirmou, "
+        "ofereça o dia/horário real sugerido em `dias_disponiveis` e tente `agendar` de novo só "
+        "depois que o lead confirmar. Sempre passe `produto_ref` quando o agendamento for para "
+        "experimentar/retirar uma peça específica já identificada na conversa. Na mensagem final de "
+        "confirmação (só quando `agendado` vier `true`), informe a data completa com dia, mês e ANO "
+        "no formato dd/mm/aaaa (ex.: '22/08/2026', nunca '2026-08-22' nem só '22/08') — é a única "
+        "garantia real que o lead tem de que a data e o ano estão certos."
     ),
     "atualizar_lead": (
         "Atualiza os dados de interesse do lead atual (evento, peça, tamanho, cor, valor estimado) "
         "coletados na conversa até agora. Use `nome_contato` quando o lead informar ou confirmar o "
-        "nome completo de quem vai comparecer ao agendamento — é o único jeito de corrigir um nome "
-        "de exibição de WhatsApp genérico antes de um agendamento. O telefone de quem vai "
-        "comparecer NÃO é atualizado por aqui — vai direto em `agendar.cliente_telefone` na hora de "
-        "confirmar o agendamento."
+        "nome completo, para a IA passar a chamá-lo pelo nome no restante da conversa — mas isso "
+        "NÃO substitui passar `cliente_nome` na hora de chamar `agendar`, que exige o nome de novo "
+        "naquele momento (garantia independente, ver instrução da tool `agendar`). O telefone de "
+        "quem vai comparecer ao agendamento NÃO é atualizado por aqui — vai direto em "
+        "`agendar.cliente_telefone` na hora de confirmar o agendamento."
     ),
     "mover_status": (
         "Move o lead para outro status no Kanban conforme a evolução da conversa (ex.: qualificando, "
@@ -254,21 +287,79 @@ class ToolsRegistry:
             data_fim=params.data_fim,
         )
 
+    # Mesmos termos genéricos tratados em `webhooks.py::_nome_generico` — duplicado aqui de
+    # propósito (import de `webhooks.py` para dentro de `tools_registry.py` criaria dependência
+    # invertida do router para o service) para o gate de `agendar` não depender de nenhum outro
+    # passo ter rodado antes (achado real em produção, 2026-08-21).
+    _NOME_GENERICO_TERMOS = {"", "cliente", "cliente whatsapp", "whatsapp", "sem nome", "lead alfaia"}
+
+    @classmethod
+    def _nome_ainda_generico(cls, nome: str | None) -> bool:
+        normalizado = " ".join(str(nome or "").strip().split())
+        if not normalizado or normalizado.lower() in cls._NOME_GENERICO_TERMOS:
+            return True
+        # Exige "nome completo" (pelo menos duas palavras) — um nome de exibição de WhatsApp numa
+        # palavra só (ex.: "valmirmoreirajunior") passa pelo filtro mais permissivo usado em outros
+        # pontos do sistema (ele não é um dos termos-placeholder acima), mas não é um nome real
+        # confirmado pelo lead. Achado real em produção (2026-08-21): esse valor exato chegou a ser
+        # gravado como `cliente_nome` no agendamento — este gate é mais rígido de propósito.
+        return " " not in normalizado
+
+    @staticmethod
+    def _normalizar_telefone_br(telefone: str | None) -> str | None:
+        """Garante o DDI 55 quando o lead digita só DDD+número (achado real em produção,
+        2026-08-21: telefone de comparecimento gravado como "85991733321", sem DDI, inconsistente
+        com o formato usado em todo o resto do sistema). Não valida DDD/tamanho — só evita o caso
+        mais comum de dado incompleto; nunca inventa dígitos que o lead não informou."""
+        if not telefone:
+            return telefone
+        digitos = "".join(c for c in telefone if c.isdigit())
+        if len(digitos) in (10, 11) and not digitos.startswith("55"):
+            digitos = "55" + digitos
+        return digitos or telefone
+
     def agendar(self, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         params = AgendarInput(**args)
         tenant_id = ctx.get("tenant_id", "tenant_piloto")
         lead = ctx.get("lead")
         contato = ctx.get("contato")
         lead_id = lead.id if lead else "lead_piloto"
-        # Nome/telefone reais vivem em ContatoDTO, não em LeadDTO/LeadModel (que nunca tiveram
-        # esses campos) — usar `lead` aqui sempre caía no default e gravava "Lead ALFAIA" no ERP.
-        cliente_nome = contato.nome if contato and getattr(contato, "nome", None) else "Lead ALFAIA"
+
+        # Garantia dura de nome (achado real em produção, 2026-08-21): a IA confirmou o nome em
+        # texto mas nunca chamou atualizar_lead, e o agendamento foi gravado com o nome de exibição
+        # genérico do WhatsApp mesmo assim. `agendar` agora aceita `cliente_nome` diretamente (não
+        # depende de uma chamada separada anterior) e, se ainda assim não houver nome real nem aqui
+        # nem já confirmado no contato, RECUSA criar o agendamento — nunca grava um nome genérico
+        # no ERP. `sucesso: True`/`agendado: False` (não é falha de sistema, não aciona transbordo)
+        # para a IA simplesmente pedir o nome de novo.
+        cliente_nome = params.cliente_nome or (contato.nome if contato and getattr(contato, "nome", None) else None)
+        if self._nome_ainda_generico(cliente_nome):
+            # Mensagem diferente quando já veio ALGUMA coisa (só falta o sobrenome) vs. nada ainda
+            # — sem isso, um lead que já respondeu com um único nome ("Valmir") recebe de volta a
+            # mesma pergunta genérica e pode ficar em loop sem entender o que falta (achado de
+            # revisão, 2026-08-21).
+            nome_bruto = " ".join(str(cliente_nome or "").strip().split())
+            if nome_bruto and nome_bruto.lower() not in self._NOME_GENERICO_TERMOS:
+                mensagem = f'Preciso também do sobrenome — "{nome_bruto}" sozinho não é suficiente para o agendamento.'
+            else:
+                mensagem = "Ainda não tenho o nome completo (nome e sobrenome) de quem vai comparecer — preciso dele antes de confirmar o agendamento."
+            return {
+                "sucesso": True,
+                "agendado": False,
+                "motivo": "nome_pendente",
+                "mensagem": mensagem,
+            }
+        # Corrige o nome do contato para os próximos turnos (ex.: a IA passar a chamar o lead pelo
+        # nome) sempre que `agendar` já recebeu um nome real direto — não depende de atualizar_lead.
+        if contato and params.cliente_nome and not self._nome_ainda_generico(params.cliente_nome):
+            contato.nome = params.cliente_nome
+
         # `params.cliente_telefone` é o telefone de quem vai comparecer, quando informado
         # explicitamente e diferente de quem está conversando — só usado para o registro do
         # agendamento, NUNCA sobrescreve `contato.telefone` (endereço real de envio da resposta
         # no WhatsApp; achado real, 2026-08-21: confundir os dois faria a confirmação ir para o
         # número errado quando alguém agenda para outra pessoa).
-        cliente_telefone = params.cliente_telefone or (
+        cliente_telefone = self._normalizar_telefone_br(params.cliente_telefone) or (
             contato.telefone if contato and getattr(contato, "telefone", None) else "5585988112233"
         )
 

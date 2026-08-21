@@ -461,7 +461,7 @@ def test_tool_agendar_usa_nome_e_telefone_reais_do_contato():
 
     resultado = tools_registry.executar_tool(
         "agendar",
-        {"tipo": "prova", "data": "2026-08-21", "hora": "08:00"},
+        {"tipo": "prova", "data": "2026-08-21", "hora": "14:00"},
         {"tenant_id": "t1", "lead": lead, "contato": contato, "lead_service": None},
     )
 
@@ -803,7 +803,7 @@ def test_agendar_com_cliente_telefone_nao_sobrescreve_telefone_de_envio():
     para o número errado).
     """
     contato = ContatoDTO(
-        id="cnt_1", tenant_id="t1", nome="Mariana",
+        id="cnt_1", tenant_id="t1", nome="Mariana Silva",
         telefone="5585988112233", primeiro_contato_em="2026-08-10",
     )
     lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
@@ -812,7 +812,7 @@ def test_agendar_com_cliente_telefone_nao_sobrescreve_telefone_de_envio():
     resultado = tools_registry.executar_tool(
         "agendar",
         {
-            "tipo": "prova", "data": "2026-09-05", "hora": "10:00",
+            "tipo": "prova", "data": "2026-09-05", "hora": "14:00",
             "cliente_telefone": "5585991234567",
         },
         ctx,
@@ -822,6 +822,82 @@ def test_agendar_com_cliente_telefone_nao_sobrescreve_telefone_de_envio():
     assert resultado["agendamento"]["cliente_telefone"] == "5585991234567"
     # O endereço de envio no WhatsApp continua o mesmo — nunca é trocado por dado de agendamento
     assert contato.telefone == "5585988112233"
+
+
+def test_agendar_recusa_criar_agendamento_sem_nome_real():
+    """
+    Achado real em produção (2026-08-21): a IA confirmou o nome em texto ("Obrigado, Valmir
+    Junior!") mas nunca chamou atualizar_lead, e o agendamento foi gravado com o nome de exibição
+    genérico do WhatsApp mesmo assim. `agendar` agora recusa criar o agendamento (sem acionar
+    transbordo — `sucesso: True`, `agendado: False`) quando não há nome real nem em
+    `cliente_nome` nem já confirmado no contato.
+    """
+    contato = ContatoDTO(
+        id="cnt_1", tenant_id="t1", nome="valmirmoreirajunior",
+        telefone="5585988112233", primeiro_contato_em="2026-08-10",
+    )
+    lead = LeadModel(id="lead_501", tenant_id="t1", contato_id="cnt_1")
+    ctx = {"tenant_id": "t1", "lead": lead, "contato": contato}
+
+    resultado = tools_registry.executar_tool(
+        "agendar",
+        {"tipo": "prova", "data": "2026-09-06", "hora": "14:00"},
+        ctx,
+    )
+
+    assert resultado["sucesso"] is True
+    assert resultado["agendado"] is False
+    assert resultado["motivo"] == "nome_pendente"
+    assert "agendamento" not in resultado
+    # Nome genérico do WhatsApp não é promovido a "nome real" por conta própria
+    assert contato.nome == "valmirmoreirajunior"
+
+
+def test_agendar_com_cliente_nome_direto_nao_depende_de_atualizar_lead_anterior():
+    """
+    `agendar.cliente_nome` grava o nome direto no agendamento mesmo que `atualizar_lead` nunca
+    tenha sido chamado nesta conversa (achado real: a IA às vezes confirma o nome em texto mas
+    pula a chamada de atualizar_lead) — e corrige `contato.nome` para os próximos turnos.
+    """
+    contato = ContatoDTO(
+        id="cnt_1", tenant_id="t1", nome="valmirmoreirajunior",
+        telefone="5585988112233", primeiro_contato_em="2026-08-10",
+    )
+    lead = LeadModel(id="lead_502", tenant_id="t1", contato_id="cnt_1")
+    ctx = {"tenant_id": "t1", "lead": lead, "contato": contato}
+
+    resultado = tools_registry.executar_tool(
+        "agendar",
+        {"tipo": "prova", "data": "2026-09-06", "hora": "14:00", "cliente_nome": "Valmir Junior"},
+        ctx,
+    )
+
+    assert resultado["sucesso"] is True
+    assert resultado["agendado"] is not False
+    assert resultado["agendamento"]["cliente_nome"] == "Valmir Junior"
+    assert contato.nome == "Valmir Junior"
+
+
+def test_agendar_normaliza_telefone_sem_ddi():
+    """
+    Achado real em produção (2026-08-21): telefone de comparecimento gravado como
+    "85991733321" (sem DDI 55), inconsistente com o formato usado no resto do sistema.
+    `agendar.cliente_telefone` agora normaliza DDD+número para incluir o DDI.
+    """
+    contato = ContatoDTO(
+        id="cnt_1", tenant_id="t1", nome="Mariana Silva",
+        telefone="5585988112233", primeiro_contato_em="2026-08-10",
+    )
+    lead = LeadModel(id="lead_503", tenant_id="t1", contato_id="cnt_1")
+    ctx = {"tenant_id": "t1", "lead": lead, "contato": contato}
+
+    resultado = tools_registry.executar_tool(
+        "agendar",
+        {"tipo": "prova", "data": "2026-09-06", "hora": "14:00", "cliente_telefone": "85991733321"},
+        ctx,
+    )
+
+    assert resultado["agendamento"]["cliente_telefone"] == "5585991733321"
 
 
 def test_motor_nao_reporta_nome_atualizado_quando_nao_muda():
