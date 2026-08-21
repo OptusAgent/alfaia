@@ -19,6 +19,13 @@ NUMERIC_MENU_PATTERN = re.compile(
 )
 MENU_INVITE_PATTERN = re.compile(r"(?:escolha\s+(?:uma\s+)?op[cç][aã]o|digite\s+\d+|responda\s+com\s+\d+)", re.IGNORECASE)
 MENU_LINE_PATTERN = re.compile(r"(?im)^\s*(?:[-*•]\s+|\d+[\.)]\s+|[1-9]\ufe0f?\u20e3\s*).+$")
+MENU_LINE_PREFIXO_PATTERN = re.compile(r"^\s*(?:[-*•]\s+|\d+[\.)]\s+|[1-9]\ufe0f?\u20e3\s*)")
+# Achado real em produção (2026-08-21): horários de agendamento formatados como lista com
+# bullet/número eram apagados por inteiro pela sanitização de menu (correto remover o "formato
+# de menu", errado remover o DADO real junto) — o lead nunca via os horários disponíveis. Uma
+# linha de "menu" que contém horário ou valor é dado real (P3) e precisa sobreviver, só sem o
+# bullet/número — vira frase corrida em vez de lista.
+DADO_REAL_EM_LINHA_PATTERN = re.compile(r"\d{1,2}[:h]\d{2}\b|R\$\s?\d", re.IGNORECASE)
 SENSITIVE_DATA_PATTERN = re.compile(r"\b(cpf|rg|comprovante|foto\s+do\s+documento|dados\s+bancários)\b", re.IGNORECASE)
 # Story 4.9, follow-up: a IA às vezes tenta "mostrar" a foto ela mesma, inserindo sintaxe markdown
 # de imagem/link na resposta (ex.: "![Terno](https://...)") — como o WhatsApp não renderiza isso,
@@ -77,10 +84,38 @@ class AIEngineService:
         Garante que a resposta da IA nunca contenha menus numéricos nem solicite dados sensíveis (AC 4, AC 7).
         """
         if NUMERIC_MENU_PATTERN.search(texto):
-            logger.warning("Sanitização: Menu numérico detectado e removido da resposta da IA.")
+            logger.warning("Sanitização: Menu numérico detectado na resposta da IA.")
             tinha_convite_menu = bool(MENU_INVITE_PATTERN.search(texto))
-            texto = MENU_INVITE_PATTERN.sub("", texto)
-            texto = MENU_LINE_PATTERN.sub("", texto)
+
+            # Linha por linha: uma linha em formato de "menu" que contém horário/valor é dado
+            # real (P3) — vira frase corrida no lugar do bullet, nunca é apagada. Uma linha de
+            # menu sem dado real (ex.: "1. Ver catálogo") continua sendo removida por inteiro.
+            linhas_finais: list[str] = []
+            dados_pendentes: list[str] = []
+
+            def _flush_dados_pendentes():
+                if not dados_pendentes:
+                    return
+                if len(dados_pendentes) == 1:
+                    frase = dados_pendentes[0]
+                elif len(dados_pendentes) == 2:
+                    frase = f"{dados_pendentes[0]} e {dados_pendentes[1]}"
+                else:
+                    frase = ", ".join(dados_pendentes[:-1]) + f" e {dados_pendentes[-1]}"
+                linhas_finais.append(frase)
+                dados_pendentes.clear()
+
+            for linha in texto.split("\n"):
+                if MENU_LINE_PATTERN.match(linha):
+                    conteudo = MENU_LINE_PREFIXO_PATTERN.sub("", linha).strip()
+                    if conteudo and DADO_REAL_EM_LINHA_PATTERN.search(conteudo):
+                        dados_pendentes.append(conteudo)
+                    continue
+                _flush_dados_pendentes()
+                linhas_finais.append(MENU_INVITE_PATTERN.sub("", linha))
+            _flush_dados_pendentes()
+
+            texto = "\n".join(linhas_finais)
             texto = NUMERIC_MENU_PATTERN.sub("", texto).strip()
             texto = re.sub(r"\n{3,}", "\n\n", texto)
             texto = re.sub(r"\s+(?=\n)", "", texto)

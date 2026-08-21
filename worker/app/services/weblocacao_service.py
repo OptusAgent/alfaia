@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime, timedelta
 import logging
 from typing import Any
 from pydantic import BaseModel, Field
@@ -183,13 +184,53 @@ class WLMockAdapter:
             tamanhos_disponiveis=list(item["tamanhos"]),
         )
 
-    def consultar_slots(self, tipo: str, data_inicio: str, data_fim: str | None = None) -> list[WLSlotDTO]:
+    def consultar_slots(
+        self, tipo: str, data_inicio: str, data_fim: str | None = None, tenant_id: str | None = None
+    ) -> list[WLSlotDTO]:
+        # Achado real em produção (2026-08-21): horários fixos de sempre, sem nenhum conceito de
+        # expediente real — a IA chegou a oferecer horário fora do funcionamento da loja. Agora
+        # gera os slots reais a partir de `horarios_funcionamento` (tabela por tenant/dia da
+        # semana); só cai no fixo de 4 horários se a tabela genuinamente não estiver acessível
+        # (nunca deixa a conversa sem nenhuma opção, I2) — um dia fechado de verdade (ex.: domingo,
+        # sem linha cadastrada) devolve lista vazia real, não o fallback.
+        slots_reais = self._gerar_slots_por_horario_funcionamento(data_inicio, tenant_id)
+        if slots_reais is not None:
+            return slots_reais
+
         return [
             WLSlotDTO(data=data_inicio, hora="09:00", vagas_totais=2, vagas_livres=2),
             WLSlotDTO(data=data_inicio, hora="11:00", vagas_totais=2, vagas_livres=1),
             WLSlotDTO(data=data_inicio, hora="14:00", vagas_totais=2, vagas_livres=2),
             WLSlotDTO(data=data_inicio, hora="16:00", vagas_totais=2, vagas_livres=0),
         ]
+
+    @staticmethod
+    def _gerar_slots_por_horario_funcionamento(data_inicio: str, tenant_id: str | None) -> list[WLSlotDTO] | None:
+        if not tenant_id or not supabase_rest_service.configurado:
+            return None
+        try:
+            data_dt = datetime.fromisoformat(data_inicio)
+        except ValueError:
+            return None
+
+        # Python: segunda=0..domingo=6. Postgres extract(dow): domingo=0..sábado=6 (convenção
+        # usada em horarios_funcionamento.dia_semana).
+        dia_semana_pg = (data_dt.weekday() + 1) % 7
+        linhas = supabase_rest_service.listar_horarios_funcionamento(tenant_id, dia_semana_pg)
+        if linhas is None:
+            return None
+
+        slots: list[WLSlotDTO] = []
+        for linha in linhas:
+            abertura = datetime.strptime(linha["hora_abertura"], "%H:%M:%S")
+            fechamento = datetime.strptime(linha["hora_fechamento"], "%H:%M:%S")
+            atual = abertura
+            while atual < fechamento:
+                slots.append(
+                    WLSlotDTO(data=data_inicio, hora=atual.strftime("%H:%M"), vagas_totais=2, vagas_livres=2)
+                )
+                atual += timedelta(hours=1)
+        return slots
 
     def criar_agendamento(self, dados: dict[str, Any]) -> WLAgendamentoDTO:
         return WLAgendamentoDTO(
@@ -311,7 +352,7 @@ class WebLocacaoService:
         t0 = time.time()
 
         if modo == "mock":
-            res = self.mock_adapter.consultar_slots(tipo, data_inicio)
+            res = self.mock_adapter.consultar_slots(tipo, data_inicio, tenant_id=tenant_id)
             latencia = int((time.time() - t0) * 1000)
             self.registrar_chamada(tenant_id, "GET", "/agenda/slots", 200, latencia)
             return res

@@ -86,7 +86,11 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "consultar_slots": (
         "Consulta horários livres reais para agendamento (prova, retirada, ajuste) num período. "
-        "Chame antes de oferecer qualquer horário ao lead — nunca inventar disponibilidade de agenda."
+        "Chame antes de oferecer qualquer horário ao lead — nunca inventar disponibilidade de "
+        "agenda. Ao apresentar os horários retornados, escreva em frase corrida, nunca em lista "
+        "com bullet/número/quebra de linha por horário (ex.: 'temos às 9h, 11h e 14h', nunca "
+        "'- 09:00\\n- 11:00\\n- 14:00') — uma lista quebrada em linhas é removida pela "
+        "sanitização de menu do sistema antes de chegar ao lead."
     ),
     "agendar": (
         "Cria de fato um agendamento na WebLocação para o lead atual. Só chamar depois que o lead "

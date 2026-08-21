@@ -47,6 +47,39 @@ def test_motor_nunca_gera_menu_numerico():
     assert sanitizado == "Olá!"
 
 
+def test_motor_preserva_horarios_reais_mesmo_formatados_como_lista():
+    """
+    Regressão do achado real em produção (2026-08-21): a IA listou os horários disponíveis com
+    bullet/quebra de linha por item ("- 09:00\\n- 11:00\\n- 14:00") e a sanitização de menu
+    apagava a lista inteira, deixando "temos os seguintes horários disponíveis:" seguido de nada
+    — o lead nunca via os horários de verdade. Uma linha de "menu" com horário/valor real (P3)
+    agora vira frase corrida, nunca é apagada.
+    """
+    raw_response = (
+        "Para amanhã, dia 21/08, temos os seguintes horários disponíveis para a prova do "
+        "Terno Areia Rústico:\n"
+        "- 09:00\n- 11:00\n- 14:00\n"
+        "Qual desses horários funciona melhor para você?"
+    )
+    sanitizado = AIEngineService.sanitizar_resposta_ia(raw_response)
+
+    assert "09:00" in sanitizado
+    assert "11:00" in sanitizado
+    assert "14:00" in sanitizado
+    assert "- 09:00" not in sanitizado
+    assert "Qual desses horários funciona melhor para você?" in sanitizado
+
+
+def test_motor_ainda_remove_lista_de_acao_sem_dado_real():
+    """Uma lista sem dado real (horário/valor) continua sendo removida por inteiro, não naturalizada."""
+    raw_response = "Posso te ajudar assim:\n1. Ver catálogo\n2. Agendar prova\nO que prefere?"
+    sanitizado = AIEngineService.sanitizar_resposta_ia(raw_response)
+
+    assert "Ver catálogo" not in sanitizado
+    assert "Agendar prova" not in sanitizado
+    assert "O que prefere?" in sanitizado
+
+
 def test_motor_substitui_menu_puro_por_pergunta_natural():
     raw_response = "Escolha uma opção:\n1. Ver catálogo\n2) Agendar prova\n1️⃣ Falar com atendente"
     sanitizado = AIEngineService.sanitizar_resposta_ia(raw_response)

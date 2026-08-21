@@ -291,6 +291,26 @@ class SupabaseRestService:
             logger.warning("Falha ao listar agendamentos por periodo (nao bloqueante): %s", e)
             return None
 
+    def listar_horarios_funcionamento(self, tenant_id: str, dia_semana: int) -> list[dict[str, Any]] | None:
+        """
+        Lê o horário de funcionamento real do tenant para um dia da semana (0=domingo..6=sábado),
+        usado por `consultar_slots` para nunca oferecer horário fora do expediente (achado real em
+        produção, 2026-08-21). `None` quando não configurado — o chamador cai no fallback fixo.
+        """
+        try:
+            filtro = (
+                f"horarios_funcionamento?select=hora_abertura,hora_fechamento"
+                f"&tenant_id=eq.{quote(tenant_id, safe='')}&dia_semana=eq.{dia_semana}&ativo=eq.true"
+                "&order=hora_abertura.asc"
+            )
+            res = self._request_sync("GET", filtro)
+            if res is None or res.status_code >= 300:
+                return None
+            return res.json()
+        except Exception as e:
+            logger.warning("Falha ao listar horario de funcionamento (nao bloqueante): %s", e)
+            return None
+
     async def atualizar_status_canal(self, canal_id: str, status: str, raw: dict[str, Any] | None = None) -> None:
         res = await self._request(
             "PATCH",

@@ -26,6 +26,9 @@ Implementar automações e toggles configuráveis por tenant, os parâmetros de 
 | S-32 | Automações e toggles | S | §16, §19 |
 | S-33 | Prompt, persona e parâmetros | M | §16, §19 |
 | S-34 | Onboarding de tenant | M | *sem mapeamento em §26 — ver Observações* |
+| — (8.4) | Configuração de horário de funcionamento (CRUD) | M | AC 11 (agendamento nunca oferece horário fora do expediente) |
+
+Story 8.4 é emergente, criada em 2026-08-21 a partir de um achado real durante teste de agendamento via WhatsApp: `consultar_slots` não tinha nenhum conceito de expediente real. Tabela/seed/leitura já aplicados como hotfix; a story cobre o CRUD via Portal. Ver `docs/stories/8.4.story.md`. Sem ID `S-` original do PRD.
 
 ## Dependências
 

@@ -131,3 +131,62 @@ def test_wl_mock_filtra_por_q_codigo_especifico():
     assert len(resultado) == 1
     assert resultado[0].ref == "T-203"
     assert resultado[0].nome == "Terno Linho Praia Champanhe"
+
+
+def test_wl_mock_consultar_slots_usa_horario_de_funcionamento_real(monkeypatch):
+    """
+    Achado real em produção (2026-08-21): consultar_slots sempre devolvia 4 horários fixos
+    (09:00, 11:00, 14:00, 16:00), sem nenhum conceito de expediente real — a IA chegou a
+    oferecer horário fora do funcionamento da loja. Agora, com a tabela `horarios_funcionamento`
+    configurada, os slots vêm de verdade dela.
+    """
+    import app.services.weblocacao_service as wl_module
+
+    class FakeSupabaseRest:
+        configurado = True
+
+        def listar_horarios_funcionamento(self, tenant_id, dia_semana):
+            # 2026-08-24 é uma segunda-feira -> dia_semana pg = 1
+            assert dia_semana == 1
+            return [
+                {"hora_abertura": "09:00:00", "hora_fechamento": "12:00:00"},
+                {"hora_abertura": "14:00:00", "hora_fechamento": "19:00:00"},
+            ]
+
+    monkeypatch.setattr(wl_module, "supabase_rest_service", FakeSupabaseRest())
+
+    mock = WLMockAdapter()
+    slots = mock.consultar_slots(tipo="prova", data_inicio="2026-08-24", tenant_id="tenant_x")
+
+    horarios = [s.hora for s in slots]
+    assert horarios == ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
+    assert "12:00" not in horarios  # fechado para almoço
+    assert "08:00" not in horarios  # antes de abrir
+    assert "19:00" not in horarios  # já fechou
+
+
+def test_wl_mock_consultar_slots_dia_fechado_devolve_vazio(monkeypatch):
+    """Domingo sem linha cadastrada = loja fechada de verdade — lista vazia, não o fallback fixo."""
+    import app.services.weblocacao_service as wl_module
+
+    class FakeSupabaseRest:
+        configurado = True
+
+        def listar_horarios_funcionamento(self, tenant_id, dia_semana):
+            assert dia_semana == 0  # domingo
+            return []
+
+    monkeypatch.setattr(wl_module, "supabase_rest_service", FakeSupabaseRest())
+
+    mock = WLMockAdapter()
+    slots = mock.consultar_slots(tipo="prova", data_inicio="2026-08-23", tenant_id="tenant_x")  # domingo
+
+    assert slots == []
+
+
+def test_wl_mock_consultar_slots_sem_tabela_cai_no_fallback_fixo():
+    """Sem tenant_id ou Supabase não configurado: mantém o fallback fixo de sempre (I2)."""
+    mock = WLMockAdapter()
+    slots = mock.consultar_slots(tipo="prova", data_inicio="2026-09-01")
+    assert len(slots) == 4
+    assert slots[0].hora == "09:00"
