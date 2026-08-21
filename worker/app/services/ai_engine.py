@@ -26,6 +26,18 @@ MENU_LINE_PREFIXO_PATTERN = re.compile(r"^\s*(?:[-*•]\s+|\d+[\.)]\s+|[1-9]\ufe
 # linha de "menu" que contém horário ou valor é dado real (P3) e precisa sobreviver, só sem o
 # bullet/número — vira frase corrida em vez de lista.
 DADO_REAL_EM_LINHA_PATTERN = re.compile(r"\d{1,2}[:h]\d{2}\b|R\$\s?\d", re.IGNORECASE)
+# Ajuste de produto (2026-08-21, reversão): a lista numerada de catálogo (uma linha por produto,
+# formato "N. <código> - <descrição> - <cor> - tamanhos: <...>", mandado pela tool_description de
+# buscar_produtos) é a ÚNICA lista numerada intencional que a IA deve emitir — precisa sobreviver
+# intacta à sanitização de menu (que existe para banir "escolha uma opção" fake), diferente de
+# listas de horário (essas continuam virando frase corrida). Ancorado na palavra "tamanhos:" do
+# formato mandado, não no formato do código do produto — o código real varia por provedor/adapter
+# (WL real pode devolver algo diferente do "X-999" do catálogo mock) e não pode ser a única âncora.
+LISTA_PRODUTOS_PATTERN = re.compile(r"(?im)^\s*\d+[\.)]\s+.*\btamanhos?\s*:")
+
+
+def _normalizar_codigo(valor: str) -> str:
+    return re.sub(r"[^0-9a-z]", "", valor.casefold())
 SENSITIVE_DATA_PATTERN = re.compile(r"\b(cpf|rg|comprovante|foto\s+do\s+documento|dados\s+bancários)\b", re.IGNORECASE)
 # Story 4.9, follow-up: a IA às vezes tenta "mostrar" a foto ela mesma, inserindo sintaxe markdown
 # de imagem/link na resposta (ex.: "![Terno](https://...)") — como o WhatsApp não renderiza isso,
@@ -74,10 +86,6 @@ class AIEngineService:
     # significado de produto — @architect pode ajustar no gate se achar pouco/muito.
     MAX_TOOL_CALL_ITERATIONS = 4
 
-    # Máximo de imagens de produto enviadas por troca (story 4.9, AC 1) — evita flood no
-    # WhatsApp. Valor de implementação, sem significado de produto documentado no PRD.
-    MAX_MIDIAS_POR_TROCA = 3
-
     def __init__(self, llm_client: OpenRouterClient | None = None):
         self.llm_client = llm_client or openrouter_client
 
@@ -86,7 +94,7 @@ class AIEngineService:
         """
         Garante que a resposta da IA nunca contenha menus numéricos nem solicite dados sensíveis (AC 4, AC 7).
         """
-        if NUMERIC_MENU_PATTERN.search(texto):
+        if NUMERIC_MENU_PATTERN.search(texto) and not LISTA_PRODUTOS_PATTERN.search(texto):
             logger.warning("Sanitização: Menu numérico detectado na resposta da IA.")
             tinha_convite_menu = bool(MENU_INVITE_PATTERN.search(texto))
 
@@ -219,9 +227,12 @@ class AIEngineService:
         `MAX_TOOL_CALL_ITERATIONS`. Nunca deixa o modelo formular a resposta final antes do
         resultado real da tool estar na conversa (P3, I5).
 
-        `midias_sugeridas` é preenchida in-place sempre que `buscar_produtos` retornar produtos
-        reais com imagem — a chamada mais recente substitui a anterior, nunca acumula entre
-        buscas diferentes na mesma troca (story 4.9, AC 1, AC 7).
+        `midias_sugeridas` é preenchida in-place só quando `buscar_produtos` retorna exatamente 1
+        produto E `q` bate com o código real dele (o lead apontou um item específico de uma lista
+        que a própria IA mostrou antes) — uma busca de navegação/lista com vários resultados nunca
+        preenche mídia, mesmo com imagem disponível (ajuste de produto, 2026-08-21, que reverte a
+        story 4.9 AC 1/6: sem essa condição, a chamada mais recente substituiria a anterior, nunca
+        acumula entre buscas diferentes na mesma troca).
 
         Retorna `(texto_final, transbordo_acionado)`. `texto_final is None` significa "sem
         resposta do LLM" (API não configurada/falhou) — o chamador cai no mesmo fallback
@@ -297,25 +308,34 @@ class AIEngineService:
                     # Substitui (não acumula) — a busca mais recente é a que vale para esta
                     # troca; nunca reaproveita imagem de uma busca anterior (P3, AC 7).
                     midias_sugeridas.clear()
-                    for produto in resultado.get("produtos", []):
-                        if len(midias_sugeridas) >= self.MAX_MIDIAS_POR_TROCA:
-                            break
+                    # Ajuste de produto (2026-08-21, reversão): foto só quando o lead apontou um
+                    # item específico da lista que a própria IA mostrou antes — nunca só porque a
+                    # busca por acaso afunilou para 1 resultado (uma busca de navegação comum,
+                    # ex.: cor+tamanho juntos, também pode devolver 1 produto só). O sinal real de
+                    # "item específico" é `q` bater com o código (`ref`) real do único produto
+                    # devolvido — não confiar no FORMATO do código (varia por provedor/adapter:
+                    # mock usa "T-203", a WL real pode devolver outra coisa), só na relação com o
+                    # dado real da tool (achado de revisão, 2026-08-21).
+                    produtos = resultado.get("produtos", [])
+                    q_arg = str(tc.argumentos.get("q") or "").strip()
+                    ref_unico = str(produtos[0].get("ref") or "").strip() if len(produtos) == 1 else ""
+                    if ref_unico and q_arg and _normalizar_codigo(q_arg) == _normalizar_codigo(ref_unico):
+                        produto = produtos[0]
                         imagem = produto.get("imagem")
-                        if not imagem:
-                            continue
-                        tamanhos = produto.get("tamanhos_disponiveis") or (
-                            [produto["tamanho"]] if produto.get("tamanho") else []
-                        )
-                        detalhes = [
-                            str(produto.get("nome", "")),
-                            f"cód. {produto['ref']}" if produto.get("ref") else "",
-                            str(produto.get("cor", "")),
-                            f"tamanhos {', '.join(tamanhos)}" if tamanhos else "",
-                        ]
-                        legenda = " — ".join(d for d in detalhes if d)
-                        if produto.get("valor_aluguel") is not None:
-                            legenda += f" — R$ {produto['valor_aluguel']:.2f}"
-                        midias_sugeridas.append(MidiaEnvioDTO(url=imagem, legenda=legenda))
+                        if imagem:
+                            tamanhos = produto.get("tamanhos_disponiveis") or (
+                                [produto["tamanho"]] if produto.get("tamanho") else []
+                            )
+                            detalhes = [
+                                str(produto.get("nome", "")),
+                                f"cód. {produto['ref']}" if produto.get("ref") else "",
+                                str(produto.get("cor", "")),
+                                f"tamanhos {', '.join(tamanhos)}" if tamanhos else "",
+                            ]
+                            # Sem valor de aluguel na legenda de propósito — o lead só vê o preço
+                            # se perguntar explicitamente (ajuste de produto, 2026-08-21).
+                            legenda = " — ".join(d for d in detalhes if d)
+                            midias_sugeridas.append(MidiaEnvioDTO(url=imagem, legenda=legenda))
 
                 mensagens.append(
                     {

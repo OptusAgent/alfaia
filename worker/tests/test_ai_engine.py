@@ -70,6 +70,25 @@ def test_motor_preserva_horarios_reais_mesmo_formatados_como_lista():
     assert "Qual desses horários funciona melhor para você?" in sanitizado
 
 
+def test_motor_preserva_lista_numerada_de_catalogo_com_codigo_real():
+    """
+    Ajuste de produto (reversão, 2026-08-21): a lista numerada de catálogo (código real presente,
+    ex. "T-203") é a única lista numerada intencional — precisa sobreviver intacta à sanitização
+    de menu, diferente de um menu de ação fake ("1. Ver catálogo").
+    """
+    raw_response = (
+        "Encontrei essas opções de terno:\n"
+        "1. T-203 - Terno Linho Praia Champanhe - Champanhe - tamanhos: 40, 42, 44\n"
+        "2. T-201 - Terno Marinho Slim 3 Peças - Marinho - tamanhos: 42, 44, 46\n"
+        "Se gostou de alguma opção, digite o número ou o código do item para te enviar a imagem."
+    )
+    sanitizado = AIEngineService.sanitizar_resposta_ia(raw_response)
+
+    assert "1. T-203 - Terno Linho Praia Champanhe" in sanitizado
+    assert "2. T-201 - Terno Marinho Slim 3 Peças" in sanitizado
+    assert "digite o número ou o código do item" in sanitizado
+
+
 def test_motor_ainda_remove_lista_de_acao_sem_dado_real():
     """Uma lista sem dado real (horário/valor) continua sendo removida por inteiro, não naturalizada."""
     raw_response = "Posso te ajudar assim:\n1. Ver catálogo\n2. Agendar prova\nO que prefere?"
@@ -449,11 +468,11 @@ def test_tool_agendar_usa_nome_e_telefone_reais_do_contato():
     assert resultado["agendamento"]["cliente_telefone"] == "558591733321"
 
 
-def test_motor_monta_midias_reais_apos_buscar_produtos_com_sucesso():
+def test_motor_nao_envia_midia_para_lista_com_multiplos_produtos():
     """
-    Story 4.9, AC 1, 2, 6: quando buscar_produtos retorna produtos reais com imagem, o motor
-    monta midias_sugeridas com url/legenda vindos do resultado real da tool (nome, cor, tamanho,
-    valor) — nunca inventados.
+    Ajuste de produto (reversão, 2026-08-21): quando buscar_produtos retorna vários produtos
+    (apresentação em lista), o motor NÃO monta midias_sugeridas — a lista é só texto, a foto só
+    é enviada quando o lead escolhe um item específico (busca com 1 resultado só).
     """
     chamadas = {"n": 0}
 
@@ -468,7 +487,7 @@ def test_motor_monta_midias_reais_apos_buscar_produtos_com_sucesso():
                         argumentos={"evento": "casamento", "categoria": "noiva"},
                     )],
                 )
-            return LLMRespostaDTO(content="Temos duas opções lindas para o seu casamento.")
+            return LLMRespostaDTO(content="1. V-101 - Vestido Aurora - Champanhe - tamanhos: 36, 38, 40, 42")
 
     engine = AIEngineService(llm_client=FakeLLMComBuscaProdutos())
     contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
@@ -483,45 +502,41 @@ def test_motor_monta_midias_reais_apos_buscar_produtos_com_sucesso():
     )
 
     assert res.transbordo_acionado is False
-    assert len(res.midias_sugeridas) == 2
-    primeira = res.midias_sugeridas[0]
-    assert primeira.url.startswith("https://")
-    assert "Aurora" in primeira.legenda
-    assert "V-101" in primeira.legenda
-    assert "36, 38, 40, 42" in primeira.legenda
-    assert "890" in primeira.legenda
+    assert res.midias_sugeridas == []
 
 
-def test_motor_respeita_limite_de_midias_por_troca():
-    """Story 4.9, AC 1: no máximo MAX_MIDIAS_POR_TROCA imagens, mesmo com mais produtos retornados."""
-    produtos_fake = [
-        {"nome": f"Terno {i}", "cor": "Azul", "tamanho": "48", "valor_aluguel": 400.0, "imagem": f"https://x/{i}.jpg"}
-        for i in range(5)
-    ]
-
+def test_motor_envia_midia_com_codigo_em_formato_diferente_do_mock():
+    """
+    Achado de revisão (2026-08-21): o gate de mídia não pode depender do FORMATO do código
+    (mock usa "T-203"; a WL real pode devolver outro formato, ex. só dígitos ou com underscore).
+    O sinal real é `q` bater com o `ref` do único produto devolvido, seja qual for o formato.
+    """
+    produto_fake = {
+        "nome": "Vestido Real", "ref": "10234", "cor": "Azul", "tamanho": "40",
+        "valor_aluguel": 500.0, "imagem": "https://x/10234.jpg",
+    }
     chamadas = {"n": 0}
 
-    class FakeLLMComMuitosProdutos:
+    class FakeLLMComCodigoReal:
         def gerar_resposta(self, **kwargs):
             chamadas["n"] += 1
             if chamadas["n"] == 1:
                 return LLMRespostaDTO(
                     content=None,
-                    tool_calls=[LLMToolCallDTO(id="call_1", nome="buscar_produtos", argumentos={"evento": "casamento"})],
+                    tool_calls=[LLMToolCallDTO(id="call_1", nome="buscar_produtos", argumentos={"q": "10234"})],
                 )
-            return LLMRespostaDTO(content="Temos várias opções para o seu casamento.")
+            return LLMRespostaDTO(content="Esse é o Vestido Real. Gostou desse modelo?")
 
-    engine = AIEngineService(llm_client=FakeLLMComMuitosProdutos())
+    engine = AIEngineService(llm_client=FakeLLMComCodigoReal())
     contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
     lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
 
     import app.services.ai_engine as ai_engine_module
-
     original_executar_tool = ai_engine_module.tools_registry.executar_tool
 
     def fake_executar_tool(nome, argumentos, ctx):
         if nome == "buscar_produtos":
-            return {"sucesso": True, "produtos": produtos_fake, "quantidade": len(produtos_fake)}
+            return {"sucesso": True, "produtos": [produto_fake], "quantidade": 1}
         return original_executar_tool(nome, argumentos, ctx)
 
     ai_engine_module.tools_registry.executar_tool = fake_executar_tool
@@ -531,12 +546,88 @@ def test_motor_respeita_limite_de_midias_por_troca():
             contato_dto=contato,
             lead_dto=lead,
             tipo_entrada="primeiro_contato",
-            mensagens_inbound=["Quero ver ternos para casamento"],
+            mensagens_inbound=["Quero ver o 10234"],
         )
     finally:
         ai_engine_module.tools_registry.executar_tool = original_executar_tool
 
-    assert len(res.midias_sugeridas) == AIEngineService.MAX_MIDIAS_POR_TROCA
+    assert len(res.midias_sugeridas) == 1
+    assert res.midias_sugeridas[0].url == "https://x/10234.jpg"
+
+
+def test_motor_nao_envia_midia_quando_filtro_afunila_para_um_produto_sem_codigo():
+    """
+    Achado de revisão (2026-08-21): uma busca de navegação comum (ex.: cor+tamanho juntos) pode
+    afunilar para 1 resultado só, sem o lead ter apontado nenhum item específico da lista. Isso
+    não é "escolha de item" — o motor só envia foto quando `q` em si é um código de peça.
+    """
+    chamadas = {"n": 0}
+
+    class FakeLLMComFiltroEspecifico:
+        def gerar_resposta(self, **kwargs):
+            chamadas["n"] += 1
+            if chamadas["n"] == 1:
+                return LLMRespostaDTO(
+                    content=None,
+                    tool_calls=[LLMToolCallDTO(
+                        id="call_1", nome="buscar_produtos",
+                        argumentos={"categoria": "noiva", "cor": "Off-White", "tamanho": "36"},
+                    )],
+                )
+            return LLMRespostaDTO(content="1. V-101 - Vestido Aurora - Off-White - tamanhos: 36")
+
+    engine = AIEngineService(llm_client=FakeLLMComFiltroEspecifico())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="primeiro_contato",
+        mensagens_inbound=["Quero vestido de noiva off-white tamanho 36"],
+    )
+
+    assert res.midias_sugeridas == []
+
+
+def test_motor_envia_midia_quando_lead_escolhe_item_unico_da_lista():
+    """
+    Ajuste de produto (reversão, 2026-08-21): quando o lead aponta um item específico e
+    buscar_produtos retorna exatamente 1 produto, o motor monta a mídia real (foto) desse item.
+    """
+    chamadas = {"n": 0}
+
+    class FakeLLMComItemUnico:
+        def gerar_resposta(self, **kwargs):
+            chamadas["n"] += 1
+            if chamadas["n"] == 1:
+                return LLMRespostaDTO(
+                    content=None,
+                    tool_calls=[LLMToolCallDTO(
+                        id="call_1", nome="buscar_produtos", argumentos={"q": "V-101"},
+                    )],
+                )
+            return LLMRespostaDTO(content="Esse é o Vestido Aurora. Gostou desse modelo?")
+
+    engine = AIEngineService(llm_client=FakeLLMComItemUnico())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="primeiro_contato",
+        mensagens_inbound=["Quero ver o V-101"],
+    )
+
+    assert res.transbordo_acionado is False
+    assert len(res.midias_sugeridas) == 1
+    midia = res.midias_sugeridas[0]
+    assert midia.url.startswith("https://")
+    assert "Aurora" in midia.legenda
+    assert "V-101" in midia.legenda
 
 
 def test_motor_nao_sugere_midia_sem_buscar_produtos_na_troca():
@@ -595,6 +686,36 @@ def test_motor_atualiza_nome_do_contato_via_nome_contato():
 
     assert res.contato_nome_atualizado == "Valmir Moreira Junior"
     assert contato.nome == "Valmir Moreira Junior"
+
+
+def test_agendar_com_cliente_telefone_nao_sobrescreve_telefone_de_envio():
+    """
+    Ajuste de agenda (2026-08-21): quem manda mensagem pode estar agendando para outra pessoa
+    (ex.: esposa marcando prova para o esposo). `agendar.cliente_telefone` grava o telefone real
+    de quem vai comparecer no registro do agendamento, mas `contato.telefone` — o endereço real de
+    envio da resposta no WhatsApp — nunca é sobrescrito por esse dado (senão a confirmação iria
+    para o número errado).
+    """
+    contato = ContatoDTO(
+        id="cnt_1", tenant_id="t1", nome="Mariana",
+        telefone="5585988112233", primeiro_contato_em="2026-08-10",
+    )
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+    ctx = {"tenant_id": "t1", "lead": lead, "contato": contato}
+
+    resultado = tools_registry.executar_tool(
+        "agendar",
+        {
+            "tipo": "prova", "data": "2026-09-05", "hora": "10:00",
+            "cliente_telefone": "5585991234567",
+        },
+        ctx,
+    )
+
+    assert resultado["sucesso"] is True
+    assert resultado["agendamento"]["cliente_telefone"] == "5585991234567"
+    # O endereço de envio no WhatsApp continua o mesmo — nunca é trocado por dado de agendamento
+    assert contato.telefone == "5585988112233"
 
 
 def test_motor_nao_reporta_nome_atualizado_quando_nao_muda():

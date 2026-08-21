@@ -9,6 +9,17 @@ from app.services.supabase_rest import supabase_rest_service
 logger = logging.getLogger("alfaia.scheduling")
 
 
+def _fmt_data_br(data: str) -> str:
+    """Converte data ISO (YYYY-MM-DD) para dd/mm/aaaa nas mensagens voltadas ao lead — a IA tende
+    a repetir literalmente o texto real da tool (P3: nunca inventar), então se a mensagem trouxer
+    a data em ISO, é isso que chega ao WhatsApp. Achado real em produção (2026-08-21). O campo
+    `data` interno do agendamento (DB/idempotência) continua em ISO — só o texto muda."""
+    try:
+        return datetime.strptime(data, "%Y-%m-%d").strftime("%d/%m/%Y")
+    except (ValueError, TypeError):
+        return data
+
+
 class AgendamentoModel(BaseModel):
     id: str
     tenant_id: str
@@ -50,7 +61,7 @@ class SchedulingService:
                 "sucesso": True,
                 "slots": [s.model_dump() for s in slots],
                 "quantidade": len(slots),
-                "mensagem": f"Encontramos {len(slots)} horários disponíveis para {tipo} em {data_inicio}.",
+                "mensagem": f"Encontramos {len(slots)} horários disponíveis para {tipo} em {_fmt_data_br(data_inicio)}.",
             }
         except Exception as e:
             logger.error(f"Erro ao consultar slots WL: {e}")
@@ -123,7 +134,7 @@ class SchedulingService:
                 "sucesso": True,
                 "idempotente": True,
                 "agendamento": agendamento_existente.model_dump(),
-                "mensagem": f"Seu agendamento para {data} às {hora} já está confirmado no sistema.",
+                "mensagem": f"Seu agendamento para {_fmt_data_br(data)} às {hora} já está confirmado no sistema.",
             }
 
         # 2. Tratamento de falha de escrita com transbordo (AC 4, I2, P3)
@@ -200,7 +211,7 @@ class SchedulingService:
                 "sucesso": True,
                 "idempotente": False,
                 "agendamento": novo_agendamento.model_dump(),
-                "mensagem": f"Agendamento de {tipo} confirmado com sucesso para {data} às {hora}!",
+                "mensagem": f"Agendamento de {tipo} confirmado com sucesso para {_fmt_data_br(data)} às {hora}!",
             }
 
         except Exception as e:

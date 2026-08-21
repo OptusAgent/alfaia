@@ -48,6 +48,42 @@ def test_agendar_idempotencia_nao_duplica_reserva():
     assert len(service.agendamentos) == 1  # Permanece 1
 
 
+def test_mensagem_de_agendamento_usa_data_no_formato_brasileiro():
+    """Ajuste de agenda (2026-08-21): a mensagem voltada ao lead usa dd/mm/aaaa, nunca o ISO
+    (YYYY-MM-DD) interno — a IA tende a repetir literalmente o texto real da tool."""
+    service = SchedulingService()
+    service.agendamentos.clear()
+
+    res = service.agendar_prova_ou_retirada(
+        tenant_id="t1",
+        lead_id="lead_300",
+        tipo="prova",
+        data="2026-09-01",
+        hora="14:00",
+        cliente_nome="Mariana",
+        cliente_telefone="5585988112233",
+    )
+
+    assert "01/09/2026" in res["mensagem"]
+    assert "2026-09-01" not in res["mensagem"]
+    # O campo interno do agendamento continua em ISO (DB/idempotência não muda)
+    assert res["agendamento"]["data"] == "2026-09-01"
+
+    res_idempotente = service.agendar_prova_ou_retirada(
+        tenant_id="t1",
+        lead_id="lead_300",
+        tipo="prova",
+        data="2026-09-01",
+        hora="14:00",
+        cliente_nome="Mariana",
+        cliente_telefone="5585988112233",
+    )
+    assert "01/09/2026" in res_idempotente["mensagem"]
+
+    res_slots = service.consultar_slots(tenant_id="t1", tipo="prova", data_inicio="2026-09-01")
+    assert "01/09/2026" in res_slots["mensagem"]
+
+
 def test_falha_agendamento_aciona_transbordo():
     """Testa se falhas de escrita na API da WebLocação acionam transbordo humano sem inventar confirmação (AC 4, I2, P3)."""
     service = SchedulingService()
