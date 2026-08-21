@@ -35,6 +35,21 @@ def test_wl_mock_adapter_parity():
     assert itens[0].cliente_nome == "Fernanda Alencar"
 
 
+def test_wl_mock_produtos_tem_imagem_real_no_storage():
+    """
+    Regressão do achado real em produção (2026-08-21): as imagens do mock apontavam para
+    "alfaia.app/images/..." — um site real não relacionado que devolve HTML, não imagem — e
+    quebravam o envio de mídia (story 4.9). Agora devem apontar para o bucket público
+    `wl-mock-catalogo` do Supabase Storage.
+    """
+    mock = WLMockAdapter()
+    prods = mock.buscar_produtos({})
+    for produto in prods:
+        assert produto.imagem is not None
+        assert "alfaia.app" not in produto.imagem
+        assert "/storage/v1/object/public/wl-mock-catalogo/" in produto.imagem
+
+
 def test_wl_anti_corruption_layer():
     """Testa a camada anticorrupção garantindo que nenhum campo bruto do ERP vaza sem tradução (AC 2, I7)."""
     service = WebLocacaoService()

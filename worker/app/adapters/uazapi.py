@@ -408,11 +408,14 @@ class UazapiAdapter:
 
         endpoint = f"{self.base_url}/send/media"
         headers = self._get_headers("media")
+        # Nomes de campo confirmados empiricamente contra a API real da UAZAPI (2026-08-21):
+        # o payload documentado/assumido na story 2.3 usava "mediaUrl"/"mediaType", mas a API
+        # real responde 500 "missing file field" — os campos reais são "file" e "type".
         payload = {
             "instance": self.instance_name,
             "number": clean_phone,
-            "mediaUrl": url,
-            "mediaType": tipo,
+            "file": url,
+            "type": tipo,
             "caption": caption or "",
         }
 

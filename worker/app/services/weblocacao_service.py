@@ -8,6 +8,14 @@ from app.services.supabase_rest import supabase_rest_service
 
 logger = logging.getLogger("alfaia.weblocacao")
 
+# Bucket público (`wl-mock-catalogo`) com as fotos reais do catálogo de desenvolvimento — usa
+# SUPABASE_URL do ambiente para não fixar o projeto no código (story 4.9).
+_SUPABASE_URL = os.getenv("SUPABASE_URL", "https://irewoqkwywsapiiytdau.supabase.co").rstrip("/")
+
+
+def _url_imagem_mock(arquivo: str) -> str:
+    return f"{_SUPABASE_URL}/storage/v1/object/public/wl-mock-catalogo/{arquivo}"
+
 
 # DTOs Internos da Camada Anticorrupção ALFAIA (I7, PRD §7.2)
 class WLProdutoDTO(BaseModel):
@@ -83,7 +91,10 @@ class WLMockAdapter:
                 estilo="Sereia",
                 valor_aluguel=520.0,
                 disponivel=True,
-                imagem="https://alfaia.app/images/v101.jpg",
+                # URL real (bucket público Supabase Storage `wl-mock-catalogo`) — o placeholder
+                # anterior ("alfaia.app/images/...") apontava para um site real não relacionado
+                # e devolvia HTML em vez de imagem, quebrando o envio de mídia (story 4.9).
+                imagem=_url_imagem_mock("noiva001.jpg"),
             ),
             WLProdutoDTO(
                 id="wl_p102",
@@ -95,7 +106,7 @@ class WLMockAdapter:
                 estilo="Fluido",
                 valor_aluguel=480.0,
                 disponivel=True,
-                imagem="https://alfaia.app/images/v102.jpg",
+                imagem=_url_imagem_mock("noiva002.jpg"),
             ),
         ]
 
