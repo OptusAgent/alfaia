@@ -347,18 +347,32 @@ class UazapiAdapter:
         return [payload]
 
     async def enviar_presence_composing(self, to: str) -> None:
-        """Envia estado `presence: composing` para anti-ban (PRD §14.1, K1)."""
+        """
+        Envia estado `presence: composing` ("digitando...") para anti-ban e naturalidade da
+        conversa (PRD §14.1, K1). Endpoint confirmado empiricamente contra a API real
+        (optus.uazapi.com, 2026-08-21): `POST /chat/presence/{instance}` (o que estava
+        implementado até aqui) devolve HTTP 405 — esse path só aceita GET e não é o endpoint de
+        presence. O endpoint real é `POST /message/presence`, sem instância no path (resolvida
+        pelo próprio token, mesmo padrão dos demais endpoints deste adapter). Mesmo bug de
+        "assumido, nunca testado contra a API real" já visto em enviar_midia (story 2.3).
+        """
         clean_phone = normalizar_telefone(to)
-        endpoint = f"{self.base_url}/chat/presence/{self.instance_name}"
+        endpoint = f"{self.base_url}/message/presence"
         headers = self._get_headers()
-        body = {"number": clean_phone, "presence": "composing"}
+        # `delay` (ms) é aceito pela API e reforça, do lado do provedor, por quanto tempo o
+        # "digitando..." fica visível — redundante com `_aplicar_delay_anti_ban` (que ainda
+        # controla quando a mensagem de fato é enviada), mas não depende só do nosso timing local.
+        delay_ms = int(self.delay_max_ms) if self.delay_max_ms > 0 else 2000
+        body = {"number": clean_phone, "presence": "composing", "delay": delay_ms}
 
         try:
             if self._client:
-                await self._client.post(endpoint, json=body, headers=headers)
+                res = await self._client.post(endpoint, json=body, headers=headers)
             else:
                 async with httpx.AsyncClient() as client:
-                    await client.post(endpoint, json=body, headers=headers)
+                    res = await client.post(endpoint, json=body, headers=headers)
+            if res.status_code not in (200, 201):
+                logger.warning(f"Presence composing UAZAPI devolveu HTTP {res.status_code}: {res.text}")
         except Exception as e:
             logger.warning(f"Falha ao enviar presence composing para UAZAPI: {e}")
 

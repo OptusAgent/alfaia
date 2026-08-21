@@ -226,10 +226,49 @@ def test_uazapi_diagnostico_nao_expoe_valores_de_payload():
 
 
 @pytest.mark.asyncio
+async def test_uazapi_presence_composing_usa_endpoint_correto():
+    """
+    Achado real em produção (2026-08-21, confirmado empiricamente contra optus.uazapi.com): o
+    endpoint até então implementado, `POST /chat/presence/{instance}`, devolve HTTP 405 (esse path
+    só aceita GET) — o "digitando..." nunca era enviado de fato, mas a exceção era engolida em
+    silêncio (só logava, nunca propagava). O endpoint real é `POST /message/presence`, sem
+    instância no path.
+    """
+    chamadas: list[httpx.Request] = []
+
+    async def mock_handler(request: httpx.Request):
+        chamadas.append(request)
+        if "/message/presence" in str(request.url):
+            return httpx.Response(200, json={"response": "Chat presence sent successfully"})
+        return httpx.Response(200, json={"id": "wamid.001"})
+
+    transport = httpx.MockTransport(mock_handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        adapter = UazapiAdapter(
+            base_url="https://api.uazapi.com",
+            instance_name="loja_centro",
+            token="token_uazapi_123",
+            delay_min_ms=0,
+            delay_max_ms=0,
+            httpx_client=client,
+        )
+        await adapter.enviar_presence_composing("5585988124477")
+
+    assert len(chamadas) == 1
+    req = chamadas[0]
+    assert str(req.url) == "https://api.uazapi.com/message/presence"
+    assert "/chat/presence" not in str(req.url)
+    assert req.headers["token"] == "token_uazapi_123"
+    body = json.loads(req.content.decode("utf-8"))
+    assert body["number"] == "5585988124477"
+    assert body["presence"] == "composing"
+
+
+@pytest.mark.asyncio
 async def test_uazapi_enviar_texto_headers():
     """Testa envio de texto encapsulando header 'token' (AC 1, 2)."""
     async def mock_handler(request: httpx.Request):
-        if "/chat/presence" in str(request.url):
+        if "/message/presence" in str(request.url):
             return httpx.Response(200, json={"status": "ok"})
         assert request.headers["token"] == "token_uazapi_123"
         body = json.loads(request.content.decode("utf-8"))
@@ -256,7 +295,7 @@ async def test_uazapi_enviar_texto_headers():
 async def test_uazapi_enviar_midia_headers():
     """Testa envio de mídia encapsulando o header correto de mídia (AC 1, 2)."""
     async def mock_handler(request: httpx.Request):
-        if "/chat/presence" in str(request.url):
+        if "/message/presence" in str(request.url):
             return httpx.Response(200, json={"status": "ok"})
         assert request.headers["apikey"] == "token_uazapi_123"
         body = json.loads(request.content.decode("utf-8"))
@@ -335,7 +374,7 @@ async def test_uazapi_enviar_midia_retenta_em_falha_transitoria():
     tentativas = {"n": 0}
 
     async def mock_handler(request: httpx.Request):
-        if "/chat/presence" in str(request.url):
+        if "/message/presence" in str(request.url):
             return httpx.Response(200, json={"status": "ok"})
         tentativas["n"] += 1
         if tentativas["n"] == 1:
@@ -370,7 +409,7 @@ async def test_uazapi_enviar_midia_nao_retenta_em_4xx():
     tentativas = {"n": 0}
 
     async def mock_handler(request: httpx.Request):
-        if "/chat/presence" in str(request.url):
+        if "/message/presence" in str(request.url):
             return httpx.Response(200, json={"status": "ok"})
         tentativas["n"] += 1
         return httpx.Response(400, text='{"error":"bad request"}')
