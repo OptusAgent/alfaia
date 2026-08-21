@@ -29,6 +29,9 @@ class WLProdutoDTO(BaseModel):
     valor_aluguel: float
     disponivel: bool = True
     imagem: str | None = None
+    # Lista real de tamanhos em estoque (story 4.9, follow-up) — `tamanho` continua existindo
+    # (junção legível dos mesmos valores) para não quebrar nenhum consumidor já existente.
+    tamanhos_disponiveis: list[str] = []
 
 
 class WLSlotDTO(BaseModel):
@@ -69,58 +72,108 @@ class WLException(Exception):
         self.status_code = status_code
 
 
+
+# Catálogo sintético completo (9 peças reais, mesmo conjunto de imagens do bucket
+# `wl-mock-catalogo` e do `wl-fake-api` — story 4.9, follow-up 2026-08-21). Achado real: o mock
+# anterior devolvia sempre os mesmos 2 vestidos hardcoded independente do filtro pedido (um lead
+# pedindo "terno" recebia foto/dados de vestido) — corrigido para filtrar categoria/evento/cor/
+# tamanho de verdade contra um catálogo com peças distintas.
+_CATALOGO_MOCK: list[dict[str, Any]] = [
+    {"id": "wl_p101", "ref": "V-101", "nome": "Vestido Aurora Tomara-que-Caia", "categoria": "casamento/noiva",
+     "cor": "Off-White", "estilo": "Princesa (A-line)", "valor_aluguel": 890.0, "arquivo": "noiva001.jpg",
+     "tamanhos": ["36", "38", "40", "42"]},
+    {"id": "wl_p102", "ref": "V-102", "nome": "Vestido Elise Sereia Ombro a Ombro", "categoria": "casamento/noiva",
+     "cor": "Marfim", "estilo": "Sereia", "valor_aluguel": 1050.0, "arquivo": "noiva002.jpg",
+     "tamanhos": ["36", "38", "40", "42"]},
+    {"id": "wl_p201", "ref": "T-201", "nome": "Terno Marinho Slim 3 Peças", "categoria": "casamento/traje-masculino",
+     "cor": "Azul Marinho", "estilo": "Slim, 3 peças", "valor_aluguel": 420.0, "arquivo": "0002.jpeg",
+     "tamanhos": ["46", "48", "50", "52"]},
+    {"id": "wl_p202", "ref": "T-202", "nome": "Terno Areia Rústico 3 Peças", "categoria": "casamento/traje-masculino",
+     "cor": "Bege Areia", "estilo": "Rústico, 3 peças", "valor_aluguel": 450.0, "arquivo": "TERNOMASCULINO001.jpg",
+     "tamanhos": ["46", "48", "52"]},
+    {"id": "wl_p203", "ref": "T-203", "nome": "Terno Linho Praia Champanhe", "categoria": "casamento/traje-masculino",
+     "cor": "Bege Claro", "estilo": "Linho", "valor_aluguel": 460.0, "arquivo": "TERNOMASCULINO002.jpg",
+     "tamanhos": ["46", "48", "50"]},
+    {"id": "wl_p204", "ref": "T-204", "nome": "Terno Marinho Clássico Social", "categoria": "casamento/traje-masculino",
+     "cor": "Azul Marinho", "estilo": "Clássico Social", "valor_aluguel": 480.0, "arquivo": "TERNOMASCULINO003.jpg",
+     "tamanhos": ["46", "48", "50", "52"]},
+    {"id": "wl_p301", "ref": "F-301", "nome": "Vestido Noite Preto Plissado", "categoria": "festa/madrinha",
+     "cor": "Preto", "estilo": "Plissado", "valor_aluguel": 380.0, "arquivo": "VESTIDO01.jpg",
+     "tamanhos": ["36", "38", "40"]},
+    {"id": "wl_p302", "ref": "F-302", "nome": "Vestido Festa Laranja Costas Abertas", "categoria": "festa/madrinha",
+     "cor": "Laranja", "estilo": "Costas Abertas", "valor_aluguel": 350.0, "arquivo": "VESTIDO02.jpg",
+     "tamanhos": ["36", "38", "40", "42"]},
+    {"id": "wl_p303", "ref": "F-303", "nome": "Vestido Esmeralda Um Ombro Só", "categoria": "festa/madrinha",
+     "cor": "Verde Esmeralda", "estilo": "Um Ombro Só", "valor_aluguel": 360.0, "arquivo": "VESTIDO03.jpg",
+     "tamanhos": ["40", "42", "44", "46"]},
+]
+
+# Sinônimos livres que a IA pode mandar em `categoria` -> segmento(s) real(is) da categoria
+# cadastrada. Sem isso, "terno"/"smoking" nunca bateria com "traje-masculino" e o filtro
+# devolveria vazio (ou, no bug antigo, ignorava o filtro por completo).
+_SINONIMOS_CATEGORIA: dict[str, list[str]] = {
+    "terno": ["traje-masculino"], "ternos": ["traje-masculino"], "smoking": ["traje-masculino"],
+    "traje": ["traje-masculino"], "traje-masculino": ["traje-masculino"], "masculino": ["traje-masculino"],
+    "noiva": ["noiva"], "vestido de noiva": ["noiva"],
+    "madrinha": ["madrinha"], "festa": ["madrinha"],
+    "vestido": ["noiva", "madrinha"], "vestidos": ["noiva", "madrinha"],
+}
+
+
 class WLMockAdapter:
     """
     Adaptador Mock Obrigatório cumprindo rigorosamente o contrato de PRD §7.2 (I8).
     """
 
     def buscar_produtos(self, params: dict[str, Any]) -> list[WLProdutoDTO]:
-        categoria = params.get("categoria", "Vestidos")
-        tamanho = params.get("tamanho", "42")
-        cor = params.get("cor", "Champanhe")
+        evento = str(params.get("evento") or "").strip().lower()
+        categoria_in = str(params.get("categoria") or "").strip().lower()
+        cor_in = str(params.get("cor") or "").strip().lower()
+        tamanho_in = str(params.get("tamanho") or "").strip()
 
-        # Dados traduzidos sem vazamento de contrato do ERP
-        return [
-            WLProdutoDTO(
-                id="wl_p101",
-                ref="V-101",
-                nome="Vestido Longo Champanhe Sereia",
-                categoria=categoria,
-                tamanho=tamanho,
-                cor=cor,
-                estilo="Sereia",
-                valor_aluguel=520.0,
-                disponivel=True,
-                # URL real (bucket público Supabase Storage `wl-mock-catalogo`) — o placeholder
-                # anterior ("alfaia.app/images/...") apontava para um site real não relacionado
-                # e devolvia HTML em vez de imagem, quebrando o envio de mídia (story 4.9).
-                imagem=_url_imagem_mock("noiva001.jpg"),
-            ),
-            WLProdutoDTO(
-                id="wl_p102",
-                ref="V-102",
-                nome="Vestido Longo Marsala Fluido",
-                categoria=categoria,
-                tamanho=tamanho,
-                cor="Marsala",
-                estilo="Fluido",
-                valor_aluguel=480.0,
-                disponivel=True,
-                imagem=_url_imagem_mock("noiva002.jpg"),
-            ),
-        ]
+        segmentos_alvo = _SINONIMOS_CATEGORIA.get(categoria_in) if categoria_in else None
+
+        encontrados = []
+        for item in _CATALOGO_MOCK:
+            if evento and not item["categoria"].startswith(evento):
+                continue
+            if segmentos_alvo and not any(seg in item["categoria"] for seg in segmentos_alvo):
+                continue
+            if cor_in and cor_in not in item["cor"].lower():
+                continue
+            if tamanho_in and tamanho_in not in item["tamanhos"]:
+                continue
+            encontrados.append(
+                WLProdutoDTO(
+                    id=item["id"],
+                    ref=item["ref"],
+                    nome=item["nome"],
+                    categoria=item["categoria"],
+                    tamanho=", ".join(item["tamanhos"]),
+                    cor=item["cor"],
+                    estilo=item["estilo"],
+                    valor_aluguel=item["valor_aluguel"],
+                    disponivel=True,
+                    imagem=_url_imagem_mock(item["arquivo"]),
+                    tamanhos_disponiveis=list(item["tamanhos"]),
+                )
+            )
+        return encontrados
 
     def obter_produto(self, produto_id: str) -> WLProdutoDTO:
+        item = next((i for i in _CATALOGO_MOCK if i["id"] == produto_id), _CATALOGO_MOCK[0])
         return WLProdutoDTO(
-            id=produto_id,
-            ref="V-101",
-            nome="Vestido Longo Champanhe Sereia",
-            categoria="Vestidos",
-            tamanho="42",
-            cor="Champanhe",
-            estilo="Sereia",
-            valor_aluguel=520.0,
+            id=item["id"],
+            ref=item["ref"],
+            nome=item["nome"],
+            categoria=item["categoria"],
+            tamanho=", ".join(item["tamanhos"]),
+            cor=item["cor"],
+            estilo=item["estilo"],
+            valor_aluguel=item["valor_aluguel"],
             disponivel=True,
+            imagem=_url_imagem_mock(item["arquivo"]),
+            tamanhos_disponiveis=list(item["tamanhos"]),
         )
 
     def consultar_slots(self, tipo: str, data_inicio: str, data_fim: str | None = None) -> list[WLSlotDTO]:

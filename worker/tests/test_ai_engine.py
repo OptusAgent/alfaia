@@ -410,7 +410,10 @@ def test_motor_monta_midias_reais_apos_buscar_produtos_com_sucesso():
             if chamadas["n"] == 1:
                 return LLMRespostaDTO(
                     content=None,
-                    tool_calls=[LLMToolCallDTO(id="call_1", nome="buscar_produtos", argumentos={"evento": "casamento"})],
+                    tool_calls=[LLMToolCallDTO(
+                        id="call_1", nome="buscar_produtos",
+                        argumentos={"evento": "casamento", "categoria": "noiva"},
+                    )],
                 )
             return LLMRespostaDTO(content="Temos duas opções lindas para o seu casamento.")
 
@@ -430,9 +433,10 @@ def test_motor_monta_midias_reais_apos_buscar_produtos_com_sucesso():
     assert len(res.midias_sugeridas) == 2
     primeira = res.midias_sugeridas[0]
     assert primeira.url.startswith("https://")
-    assert "Champanhe" in primeira.legenda
-    assert "42" in primeira.legenda
-    assert "520" in primeira.legenda
+    assert "Aurora" in primeira.legenda
+    assert "V-101" in primeira.legenda
+    assert "36, 38, 40, 42" in primeira.legenda
+    assert "890" in primeira.legenda
 
 
 def test_motor_respeita_limite_de_midias_por_troca():

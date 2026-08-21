@@ -251,10 +251,14 @@ class AIEngineService:
                         imagem = produto.get("imagem")
                         if not imagem:
                             continue
+                        tamanhos = produto.get("tamanhos_disponiveis") or (
+                            [produto["tamanho"]] if produto.get("tamanho") else []
+                        )
                         detalhes = [
                             str(produto.get("nome", "")),
+                            f"cód. {produto['ref']}" if produto.get("ref") else "",
                             str(produto.get("cor", "")),
-                            f"tamanho {produto['tamanho']}" if produto.get("tamanho") else "",
+                            f"tamanhos {', '.join(tamanhos)}" if tamanhos else "",
                         ]
                         legenda = " — ".join(d for d in detalhes if d)
                         if produto.get("valor_aluguel") is not None:

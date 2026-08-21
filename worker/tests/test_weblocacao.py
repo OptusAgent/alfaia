@@ -11,7 +11,7 @@ def test_wl_mock_adapter_parity():
     assert len(prods) >= 2
     assert prods[0].id == "wl_p101"
     assert prods[0].ref == "V-101"
-    assert prods[0].valor_aluguel == 520.0
+    assert prods[0].valor_aluguel == 890.0
 
     # 2. GET /produtos/{id}
     prod = mock.obter_produto("wl_p101")
@@ -89,3 +89,32 @@ def test_wl_chamadas_telemetry_logging():
     assert service.chamadas_log[0]["status_code"] == 200
     assert "latencia_ms" in service.chamadas_log[0]
     assert service.chamadas_log[1]["rota"] == "/agenda/slots"
+
+
+def test_wl_mock_filtra_categoria_de_verdade_terno_nunca_devolve_vestido():
+    """
+    Regressão do achado real em produção (2026-08-21): pedir "terno" devolvia sempre os mesmos 2
+    vestidos hardcoded, com imagem/nome/preço de vestido. Agora o filtro de categoria é real —
+    "terno" (sinônimo de "traje-masculino") nunca pode devolver um produto de categoria "noiva".
+    """
+    mock = WLMockAdapter()
+
+    ternos = mock.buscar_produtos({"evento": "casamento", "categoria": "terno"})
+    assert len(ternos) > 0
+    for produto in ternos:
+        assert "traje-masculino" in produto.categoria
+        assert "vestido" not in produto.nome.lower()
+        assert "noiva" not in produto.categoria
+
+    noivas = mock.buscar_produtos({"evento": "casamento", "categoria": "noiva"})
+    assert len(noivas) > 0
+    for produto in noivas:
+        assert "noiva" in produto.categoria
+        assert "terno" not in produto.nome.lower()
+
+
+def test_wl_mock_tamanho_filtra_por_estoque_real():
+    """Pedir um tamanho fora de estoque de todas as peças de uma categoria não devolve nada (P3)."""
+    mock = WLMockAdapter()
+    resultado = mock.buscar_produtos({"categoria": "terno", "tamanho": "38"})
+    assert resultado == []
