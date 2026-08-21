@@ -33,6 +33,12 @@ class LeadDTO(BaseModel):
     motivo_descarte: str | None = None
     ultimo_contato_em: datetime = Field(default_factory=datetime.now)
     criado_em: datetime = Field(default_factory=datetime.now)
+    # Auditoria de status (story 6.6) — sem isso, `status_transition_service` (MV3: proteção de
+    # 24h contra sobrescrita de movimentação humana) nunca tem o dado real e a proteção não
+    # dispara de verdade. Hidratados a partir de `leads.status_alterado_por`/`status_alterado_em`
+    # reais em `webhooks.py`; default aqui é só para os testes que não hidratam do banco.
+    status_alterado_por: str | None = None
+    status_alterado_em: datetime | None = None
 
 
 class ContextBuilderService:

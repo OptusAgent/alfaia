@@ -157,6 +157,89 @@ class SupabaseRestService:
 
         return res.json()
 
+    async def buscar_lead(self, lead_id: str) -> dict[str, Any] | None:
+        """
+        Lê o estado real do lead (status, dados de interesse, dados de auditoria de status) — usado
+        por `webhooks.py` para hidratar `LeadDTO` com o status REAL a cada mensagem, em vez do
+        hardcode `status="qualificando"` que existia até aqui (story 6.6, achado real em produção,
+        2026-08-21: qualquer `mover_status` chamado pela IA nunca sobrevivia ao fim da requisição).
+        """
+        res = await self._request(
+            "GET",
+            (
+                "leads?select=id,status,evento_tipo,evento_data,peca_interesse,tamanho,cor,"
+                "valor_estimado,followup_tentativas,motivo_descarte,status_alterado_em,"
+                "status_alterado_por,ultimo_contato_em,criado_em"
+                f"&id=eq.{quote(lead_id, safe='')}&limit=1"
+            ),
+        )
+        if not res or res.status_code >= 300:
+            logger.warning("Nao foi possivel buscar lead real: %s", res.text[:300] if res else "sem resposta")
+            return None
+        rows = res.json()
+        return rows[0] if rows else None
+
+    async def atualizar_status_lead(
+        self,
+        lead_id: str,
+        status: str,
+        status_alterado_por: str,
+        status_alterado_em: str,
+        motivo_descarte: str | None = None,
+    ) -> None:
+        """Persiste a transição de status decidida por `status_transition_service` de volta no
+        Postgres — sem isso, a mutação em memória de `LeadDTO.status` nunca sobrevive ao fim da
+        requisição (achado real em produção, story 6.6)."""
+        payload: dict[str, Any] = {
+            "status": status,
+            "status_alterado_por": status_alterado_por,
+            "status_alterado_em": status_alterado_em,
+        }
+        if motivo_descarte is not None:
+            payload["motivo_descarte"] = motivo_descarte
+        res = await self._request(
+            "PATCH",
+            f"leads?id=eq.{quote(lead_id, safe='')}",
+            json=payload,
+            prefer="return=minimal",
+        )
+        if not res or res.status_code >= 300:
+            logger.warning("Nao foi possivel persistir status do lead: %s", res.text[:300] if res else "sem resposta")
+
+    async def registrar_lead_evento(
+        self,
+        tenant_id: str,
+        lead_id: str,
+        tipo: str,
+        autor: str,
+        de: str | None = None,
+        para: str | None = None,
+        motivo: str | None = None,
+        detalhe: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Insere um evento real em `lead_eventos` — a tabela usa colunas de nível superior `de`/
+        `para`/`motivo` (não aninhados em `detalhe`, como o `LeadEventoModel` em memória fazia);
+        confirmado contra o schema real antes de escrever este insert (story 6.6).
+        """
+        res = await self._request(
+            "POST",
+            "lead_eventos",
+            json={
+                "tenant_id": tenant_id,
+                "lead_id": lead_id,
+                "tipo": tipo,
+                "de": de,
+                "para": para,
+                "autor": autor,
+                "motivo": motivo,
+                "detalhe": detalhe or {},
+            },
+            prefer="return=minimal",
+        )
+        if not res or res.status_code >= 300:
+            logger.warning("Nao foi possivel registrar lead_evento: %s", res.text[:300] if res else "sem resposta")
+
     async def atualizar_contato_nome(self, contato_id: str, nome: str) -> None:
         nome_limpo = " ".join(str(nome or "").split())
         if not contato_id or not nome_limpo:

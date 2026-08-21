@@ -62,8 +62,8 @@ class StatusTransitionService:
             return False, msg_erro
 
         # 2. MV3: Se humano moveu nas últimas 24h, a IA não sobrescreve — registra divergência (PRD §9.7, AC 4, T11)
-        status_alterado_por = getattr(lead, "status_alterado_por", "sistema")
-        status_alterado_em = getattr(lead, "status_alterado_em", lead.criado_em)
+        status_alterado_por = getattr(lead, "status_alterado_por", None) or "sistema"
+        status_alterado_em = getattr(lead, "status_alterado_em", None) or lead.criado_em
         if autor == "ia" and status_alterado_por in ("atendente", "humano"):
             if (simulated_now - status_alterado_em) < timedelta(hours=24):
                 msg_erro = "MV3: Alteração bloqueada. Um atendente humano movimentou este lead nas últimas 24h."

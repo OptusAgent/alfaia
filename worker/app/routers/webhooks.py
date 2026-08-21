@@ -225,12 +225,31 @@ async def _processar_payload_background(
             nome=push_name,
             primeiro_contato_em=payload.data_atual,
         )
+
+        # Hidrata o lead com o estado REAL do Postgres (story 6.6, achado real em produção,
+        # 2026-08-21): até aqui, `LeadDTO` era sempre montado com `status="qualificando"` fixo,
+        # ignorando o funil de verdade — um lead já `agendado`/`orcamento` voltava a ser tratado
+        # como recém-qualificado a cada mensagem, e qualquer `mover_status` que a IA já chamava
+        # não tinha efeito real (mutava só o DTO desta requisição). `lead_real=None` (lead novo,
+        # acabou de ser criado por `identificar_lead` nesta mesma chamada) cai no default seguro.
+        lead_real = await supabase_rest_service.buscar_lead(lead_id) if lead_id else None
+        status_original = (lead_real or {}).get("status") or "novo"
         lead_dto = LeadDTO(
             id=lead_id or f"lead_{telefone}",
             tenant_id=payload.tenant_id,
             contato_id=contato_dto.id,
-            status="qualificando",
+            status=status_original,
             origem="whatsapp_organico",
+            evento_tipo=(lead_real or {}).get("evento_tipo"),
+            evento_data=(lead_real or {}).get("evento_data"),
+            peca_interesse=(lead_real or {}).get("peca_interesse"),
+            tamanho=(lead_real or {}).get("tamanho"),
+            cor=(lead_real or {}).get("cor"),
+            valor_estimado=(lead_real or {}).get("valor_estimado"),
+            followup_tentativas=(lead_real or {}).get("followup_tentativas") or 0,
+            motivo_descarte=(lead_real or {}).get("motivo_descarte"),
+            status_alterado_por=(lead_real or {}).get("status_alterado_por"),
+            status_alterado_em=(lead_real or {}).get("status_alterado_em"),
         )
 
         res_ia = ai_engine_service.processar_atendimento(
@@ -251,6 +270,28 @@ async def _processar_payload_background(
         # Postgres, mesmo caminho já usado para o push_name do WhatsApp.
         if res_ia.contato_nome_atualizado and contato_id:
             await supabase_rest_service.atualizar_contato_nome(contato_id, res_ia.contato_nome_atualizado)
+
+        # `mover_status`/`agendar` já podem ter mutado `lead_dto.status` em memória durante o
+        # tool-calling (story 6.6) — persiste de volta no Postgres, senão a mudança nunca
+        # sobrevive ao fim desta requisição (mesmo achado do gap acima).
+        if lead_id and lead_dto.status != status_original:
+            agora_iso = datetime.now(timezone.utc).isoformat()
+            await supabase_rest_service.atualizar_status_lead(
+                lead_id=lead_id,
+                status=lead_dto.status,
+                status_alterado_por="ia",
+                status_alterado_em=agora_iso,
+                motivo_descarte=lead_dto.motivo_descarte if lead_dto.status == "descartado" else None,
+            )
+            await supabase_rest_service.registrar_lead_evento(
+                tenant_id=payload.tenant_id,
+                lead_id=lead_id,
+                tipo="status_alterado",
+                autor="ia",
+                de=status_original,
+                para=lead_dto.status,
+                motivo=lead_dto.motivo_descarte if lead_dto.status == "descartado" else None,
+            )
 
         # 2.5. Envia as imagens reais dos produtos encontrados ANTES do texto (story 4.9, AC 1, 3)
         # — ordem natural de catálogo: mostrar a foto, depois perguntar/confirmar em texto. Falha

@@ -79,6 +79,15 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
         async def atualizar_contato_nome(self, contato_id, nome):
             calls["nome_atualizado"] = {"contato_id": contato_id, "nome": nome}
 
+        async def buscar_lead(self, lead_id):
+            return None
+
+        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None):
+            calls["status_lead_atualizado"] = {"lead_id": lead_id, "status": status}
+
+        async def registrar_lead_evento(self, **kwargs):
+            calls.setdefault("lead_eventos", []).append(kwargs)
+
     class FakeAdapter:
         def __init__(self, base_url, instance_name, token, **kwargs):
             calls["adapter_init"] = {
@@ -174,6 +183,104 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
 
 
 @pytest.mark.asyncio
+async def test_webhook_persiste_mudanca_de_status_do_lead_no_postgres(monkeypatch):
+    """
+    Story 6.6, achado real em produção (2026-08-21): `webhooks.py` montava `LeadDTO` sempre com
+    `status="qualificando"` fixo e nunca persistia de volta qualquer mudança feita pelo motor de
+    IA (`mover_status`/`agendar` mutavam só o DTO da requisição). Este teste simula o motor real
+    mutando `lead_dto.status` em memória (mesmo efeito que `status_transition_service` produz via
+    `mover_status`/`agendar`) e confirma que o webhook lê o status REAL do lead antes de chamar a
+    IA e grava a mudança de volta (status + evento) depois.
+    """
+    calls = {"lead_buscado": None, "status_atualizado": None, "eventos": []}
+
+    class FakeSupabase:
+        async def buscar_canal_por_token(self, token):
+            return {
+                "id": "canal-123", "tenant_id": "tenant-123",
+                "uazapi_base_url": "https://uazapi.alfaia.test",
+                "uazapi_instancia": "loja-centro", "uazapi_token": "token-real-instancia",
+            }
+
+        async def buscar_ia_config(self, tenant_id):
+            return {"tenant_id": tenant_id, "modelo": "openai/gpt-4o-mini", "prompt_sistema": None}
+
+        async def registrar_mensagem(self, payload):
+            pass
+
+        async def identificar_lead(self, tenant_id, telefone, push_name, origem="whatsapp_organico"):
+            return {"contato_id": "contato-db-123", "lead_id": "lead-db-123", "entrada": "continuacao"}
+
+        async def upsert_conversa(self, tenant_id, contato_id, lead_id, canal_id):
+            return {"id": "conversa-db-123"}
+
+        async def buscar_historico_mensagens(self, conversa_id, limit=20):
+            return []
+
+        async def atualizar_contato_nome(self, contato_id, nome):
+            pass
+
+        async def buscar_lead(self, lead_id):
+            calls["lead_buscado"] = lead_id
+            return {"id": lead_id, "status": "qualificando"}
+
+        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None):
+            calls["status_atualizado"] = {"lead_id": lead_id, "status": status, "status_alterado_por": status_alterado_por}
+
+        async def registrar_lead_evento(self, **kwargs):
+            calls["eventos"].append(kwargs)
+
+    class FakeAdapter:
+        def __init__(self, base_url, instance_name, token, **kwargs):
+            pass
+
+        def normalizar_webhook(self, raw, headers):
+            return [
+                PayloadNormalizado(
+                    tenant_id="fallback-tenant", canal_id="fallback-canal", provider="uazapi",
+                    telefone="5585988124477", push_name="Cliente",
+                    mensagem="Confirmo a prova", wa_message_id="wamid.qa.status",
+                    timestamp=1786900000, data_atual="2026-08-21",
+                )
+            ]
+
+        async def enviar_texto(self, to, text):
+            return ResultadoEnvio(sucesso=True, wa_message_id="wamid.texto")
+
+    class FakeAI:
+        def processar_atendimento(self, **kwargs):
+            # Simula o efeito real de `mover_status`/`agendar` durante o tool-calling: o `lead_dto`
+            # passado por referência é mutado em memória.
+            kwargs["lead_dto"].status = "agendado"
+            return type(
+                "AIResult",
+                (),
+                {"texto_resposta": "Prova confirmada!", "midias_sugeridas": [], "contato_nome_atualizado": None},
+            )()
+
+    monkeypatch.setattr(webhooks, "supabase_rest_service", FakeSupabase())
+    monkeypatch.setattr(webhooks, "UazapiAdapter", FakeAdapter)
+    monkeypatch.setattr(webhooks, "ai_engine_service", FakeAI())
+
+    raw = json.dumps({
+        "wa_message_id": "wamid.qa.status", "event": "message.received",
+        "telefone": "85988124477", "mensagem": "Confirmo a prova",
+    }).encode("utf-8")
+
+    await webhooks._processar_payload_background(
+        provider="uazapi", raw_body=raw, headers={}, token="token-webhook",
+    )
+
+    assert calls["lead_buscado"] == "lead-db-123"
+    assert calls["status_atualizado"] == {
+        "lead_id": "lead-db-123", "status": "agendado", "status_alterado_por": "ia",
+    }
+    assert len(calls["eventos"]) == 1
+    assert calls["eventos"][0]["de"] == "qualificando"
+    assert calls["eventos"][0]["para"] == "agendado"
+
+
+@pytest.mark.asyncio
 async def test_webhook_envia_midias_antes_do_texto_e_falha_parcial_nao_bloqueia(monkeypatch):
     """
     Story 4.9, AC 3, 4, 5: mídias sugeridas pela IA são enviadas antes do texto; falha ao enviar
@@ -207,6 +314,15 @@ async def test_webhook_envia_midias_antes_do_texto_e_falha_parcial_nao_bloqueia(
             return []
 
         async def atualizar_contato_nome(self, contato_id, nome):
+            pass
+
+        async def buscar_lead(self, lead_id):
+            return None
+
+        async def atualizar_status_lead(self, lead_id, status, status_alterado_por, status_alterado_em, motivo_descarte=None):
+            pass
+
+        async def registrar_lead_evento(self, **kwargs):
             pass
 
     class FakeAdapter:

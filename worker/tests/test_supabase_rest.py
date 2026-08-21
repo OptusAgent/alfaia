@@ -168,3 +168,70 @@ async def test_supabase_rest_identifica_lead_conversa_historico_e_registra_mensa
     assert conversa["id"] == "conversa-1"
     assert historico[0]["texto"] == "Oi"
     assert [item[0] for item in calls] == ["POST", "POST", "GET", "POST", "PATCH"]
+
+
+@pytest.mark.asyncio
+async def test_supabase_rest_persiste_status_e_evento_de_lead_de_verdade(monkeypatch):
+    """
+    Story 6.6, achado real em produção (2026-08-21): todo o resto da suíte roda com
+    `SupabaseRestService` desconfigurado, então uma falha de payload nestes métodos passaria
+    despercebida (mesmo ponto-cego do bug de caption/text). Este teste inspeciona o payload HTTP
+    real enviado por `buscar_lead`/`atualizar_status_lead`/`registrar_lead_evento`.
+    """
+    monkeypatch.setenv("SUPABASE_URL", "https://supabase.alfaia.test")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-test")
+
+    calls = []
+
+    async def handler(request: httpx.Request):
+        calls.append((request.method, str(request.url)))
+        url = str(request.url)
+
+        if request.method == "GET" and "/rest/v1/leads" in url:
+            assert "id=eq.lead-1" in url
+            assert "status_alterado_por" in url
+            return httpx.Response(200, json=[{"id": "lead-1", "status": "qualificando"}])
+
+        if request.method == "PATCH" and "/rest/v1/leads" in url:
+            assert "id=eq.lead-1" in url
+            assert request.headers["Prefer"] == "return=minimal"
+            body = json.loads(request.content.decode("utf-8"))
+            assert body == {
+                "status": "agendado",
+                "status_alterado_por": "ia",
+                "status_alterado_em": "2026-08-21T12:00:00+00:00",
+            }
+            return httpx.Response(204)
+
+        if request.method == "POST" and "/rest/v1/lead_eventos" in url:
+            body = json.loads(request.content.decode("utf-8"))
+            assert body == {
+                "tenant_id": "tenant-1",
+                "lead_id": "lead-1",
+                "tipo": "status_alterado",
+                "de": "qualificando",
+                "para": "agendado",
+                "autor": "ia",
+                "motivo": "Agendamento confirmado automaticamente pela automação",
+                "detalhe": {},
+            }
+            return httpx.Response(201)
+
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http_client:
+        service = SupabaseRestService(httpx_client=http_client)
+        lead = await service.buscar_lead("lead-1")
+        await service.atualizar_status_lead(
+            lead_id="lead-1", status="agendado", status_alterado_por="ia",
+            status_alterado_em="2026-08-21T12:00:00+00:00",
+        )
+        await service.registrar_lead_evento(
+            tenant_id="tenant-1", lead_id="lead-1", tipo="status_alterado",
+            autor="ia", de="qualificando", para="agendado",
+            motivo="Agendamento confirmado automaticamente pela automação",
+        )
+
+    assert lead["status"] == "qualificando"
+    assert [item[0] for item in calls] == ["GET", "PATCH", "POST"]

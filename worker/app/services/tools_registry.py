@@ -366,7 +366,7 @@ class ToolsRegistry:
         logger.info(f"Tool 'agendar' executada [params={params.model_dump()}]")
 
         from app.services.scheduling_service import scheduling_service
-        return scheduling_service.agendar_prova_ou_retirada(
+        resultado = scheduling_service.agendar_prova_ou_retirada(
             tenant_id=tenant_id,
             lead_id=lead_id,
             tipo=params.tipo,
@@ -377,6 +377,24 @@ class ToolsRegistry:
             produto_ref=params.produto_ref,
             observacao=params.observacao,
         )
+
+        # Move o lead para "agendado" como EFEITO DIRETO de um agendamento confirmado — nunca
+        # depende de uma chamada separada a `mover_status` pela IA (mesma classe de bug já vista
+        # 2x nesta sessão: o modelo confirmou nome/peça em texto mas pulou a tool que persistiria
+        # isso). `status_transition_service` já aplica as regras MV1-MV5 (ex.: não retrocede,
+        # respeita proteção de 24h de movimentação humana) — story 6.6, AC 5.
+        if resultado.get("agendado") is True and lead:
+            from app.services.status_transition_service import status_transition_service
+            status_transition_service.validar_e_mover_status(
+                tenant_id=tenant_id,
+                lead=lead,
+                status_destino="agendado",
+                autor="ia",
+                motivo="Agendamento confirmado automaticamente pela automação",
+                lead_service=ctx.get("lead_service"),
+            )
+
+        return resultado
 
     def atualizar_lead(self, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         params = AtualizarLeadInput(**args)

@@ -878,6 +878,50 @@ def test_agendar_com_cliente_nome_direto_nao_depende_de_atualizar_lead_anterior(
     assert contato.nome == "Valmir Junior"
 
 
+def test_agendar_move_status_do_lead_para_agendado_automaticamente():
+    """
+    Story 6.6, AC 5: um agendamento confirmado (`agendado: True`) move o lead para "agendado" como
+    efeito DIRETO da tool `agendar` — não depende de uma chamada separada a `mover_status` pela IA
+    (mesma classe de bug já vista 2x nesta sessão: o modelo confirma algo em texto mas pula a tool
+    que persistiria isso).
+    """
+    contato = ContatoDTO(
+        id="cnt_1", tenant_id="t1", nome="Valmir Junior",
+        telefone="5585988112233", primeiro_contato_em="2026-08-10",
+    )
+    lead = LeadModel(id="lead_700", tenant_id="t1", contato_id="cnt_1", status="qualificando")
+    ctx = {"tenant_id": "t1", "lead": lead, "contato": contato}
+
+    resultado = tools_registry.executar_tool(
+        "agendar",
+        {"tipo": "prova", "data": "2026-09-07", "hora": "14:00", "cliente_nome": "Valmir Junior"},
+        ctx,
+    )
+
+    assert resultado["agendado"] is True
+    assert lead.status == "agendado"
+    assert lead.status_alterado_por == "ia"
+
+
+def test_agendar_nao_move_status_quando_agendamento_e_recusado():
+    """O gate de nome/horário indisponível (`agendado: False`) nunca deve mover o status do lead."""
+    contato = ContatoDTO(
+        id="cnt_1", tenant_id="t1", nome="valmirmoreirajunior",
+        telefone="5585988112233", primeiro_contato_em="2026-08-10",
+    )
+    lead = LeadModel(id="lead_701", tenant_id="t1", contato_id="cnt_1", status="qualificando")
+    ctx = {"tenant_id": "t1", "lead": lead, "contato": contato}
+
+    resultado = tools_registry.executar_tool(
+        "agendar",
+        {"tipo": "prova", "data": "2026-09-07", "hora": "14:00"},
+        ctx,
+    )
+
+    assert resultado["agendado"] is False
+    assert lead.status == "qualificando"
+
+
 def test_agendar_normaliza_telefone_sem_ddi():
     """
     Achado real em produção (2026-08-21): telefone de comparecimento gravado como
