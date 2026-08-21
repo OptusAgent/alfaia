@@ -1,0 +1,1290 @@
+<!--
+  Fluir Soluções — Retaguarda em nuvem (protótipo v3)
+  Cliente demo: Mercantil Santo Expedito — Caucaia/CE
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluir Soluções — Retaguarda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --deep:#0B3B36;      /* verde mercearia */
+    --deep-2:#0F4A43;
+    --deep-3:#166057;
+    --teal:#00B894;
+    --teal-ink:#007A63;
+    --mint:#DEF5EE;
+    --ice:#E3EEFB;   --ice-ink:#1B62B8;
+    --pump:#FDEDE0;  --pump-ink:#C25A15;
+    --gold:#FCF2D8;  --gold-ink:#8A6A08;
+    --rose:#FDE9E9;  --rose-ink:#C0393D;
+
+    --bg:#F4F7F6;
+    --card:#FFFFFF;
+    --ink:#12211F;
+    --ink-2:#3A4C49;
+    --dim:#7A8C89;
+    --line:#E7EDEB;
+    --line-2:#F1F5F4;
+
+    --ok:#00A98C; --warn:#E8890C; --bad:#D6444A;
+    --r:18px;
+    --sh:0 1px 2px rgba(11,59,54,.04), 0 10px 30px rgba(11,59,54,.06);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;padding:16px;background:var(--bg);color:var(--ink);
+    font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+  .disp{font-family:Outfit,sans-serif}
+  :focus-visible{outline:3px solid var(--teal);outline-offset:2px;border-radius:6px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  .shell{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;gap:18px;align-items:start}
+
+  /* ============ SIDEBAR ============ */
+  .side{
+    background:linear-gradient(170deg,var(--deep-2),var(--deep));
+    border-radius:24px;padding:20px 14px;position:sticky;top:16px;
+    min-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    box-shadow:0 18px 40px rgba(11,59,54,.22);
+  }
+  .logo{display:flex;align-items:center;gap:9px;padding:0 6px 22px}
+  .logo .bn{font-family:Outfit;font-size:20px;font-weight:800;color:#fff;line-height:1;letter-spacing:-.02em}
+  .logo .bn small{display:block;font-family:Inter;font-size:8px;font-weight:700;letter-spacing:.3em;color:var(--teal);margin-top:4px}
+  .mlabel{font:700 9.5px Inter;letter-spacing:.2em;color:rgba(255,255,255,.38);padding:0 8px 8px;text-transform:uppercase}
+  .side nav{display:flex;flex-direction:column;gap:2px}
+  .side nav button{
+    display:flex;align-items:center;gap:11px;width:100%;text-align:left;cursor:pointer;
+    background:none;border:none;color:rgba(255,255,255,.72);font:600 13px Inter;
+    padding:10px 11px;border-radius:11px;transition:.15s
+  }
+  .side nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+  .side nav button.on{background:#fff;color:var(--deep);font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.14)}
+  .side nav .ic{width:17px;text-align:center;font-size:14px;flex:none}
+  .side nav .tag{margin-left:auto;background:var(--teal);color:#04231D;font:800 9.5px Inter;padding:2px 7px;border-radius:20px}
+  .side nav button.on .tag{background:var(--pump-ink);color:#fff}
+  .side hr{border:none;border-top:1px solid rgba(255,255,255,.12);margin:14px 6px}
+
+  .countdown{
+    margin-top:auto;background:linear-gradient(160deg,#12564D,#0B3B36);
+    border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:15px 14px;text-align:center;
+  }
+  .countdown .l{font:700 9px Inter;letter-spacing:.18em;color:var(--teal);text-transform:uppercase}
+  .countdown .n{font-family:Outfit;font-size:40px;font-weight:800;color:#fff;line-height:1;margin:6px 0 2px}
+  .countdown .d{font-size:11px;color:rgba(255,255,255,.66);line-height:1.45}
+  .countdown .bar{height:5px;background:rgba(255,255,255,.16);border-radius:20px;margin-top:11px;overflow:hidden}
+  .countdown .bar i{display:block;height:100%;width:28%;background:var(--teal);border-radius:20px}
+
+  /* ============ TOPO ============ */
+  .main{min-width:0}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding:0 4px}
+  .top h1{font-family:Outfit;font-size:25px;font-weight:800;margin:0;letter-spacing:-.025em}
+  .top .crumb{font-size:12px;color:var(--dim);margin-top:2px}
+  .top .right{margin-left:auto;display:flex;align-items:center;gap:9px}
+  .iconbtn{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+    cursor:pointer;color:var(--ink-2);display:grid;place-items:center;font-size:14px;position:relative;transition:.15s}
+  .iconbtn:hover{background:var(--mint);border-color:var(--teal)}
+  .iconbtn .dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--bad);border:2px solid var(--card)}
+  .me{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px 12px 5px 5px}
+  .me .av{width:30px;height:30px;border-radius:10px;background:var(--deep);color:#fff;display:grid;place-items:center;font:800 11px Outfit}
+  .me .t b{display:block;font-size:12.5px;line-height:1.2}
+  .me .t span{font-size:10px;color:var(--dim)}
+
+  .view{display:none}.view.on{display:block;animation:fade .25s ease-out}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}}
+
+  /* ============ CARTÕES ============ */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:18px;overflow:hidden}
+  .card > h4{margin:0;padding:16px 18px;font-family:Outfit;font-size:15px;font-weight:700;
+    display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .card > h4 em{font-style:normal;font:600 11.5px Inter;color:var(--dim)}
+  .card > h4 + *{border-top:1px solid var(--line)}
+  .pad{padding:18px}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:14px;margin-bottom:18px}
+  .tile{border-radius:var(--r);padding:17px 18px;border:1px solid transparent}
+  .tile .l{font:700 10.5px Inter;letter-spacing:.1em;text-transform:uppercase;opacity:.72}
+  .tile .v{font-family:Outfit;font-size:33px;font-weight:800;line-height:1.05;margin:7px 0 3px;letter-spacing:-.03em}
+  .tile .d{font-size:11px;font-weight:600;opacity:.78}
+  .t-mint{background:var(--mint);color:var(--teal-ink);border-color:#C4EBE0}
+  .t-ice{background:var(--ice);color:var(--ice-ink);border-color:#CDE0F7}
+  .t-pump{background:var(--pump);color:var(--pump-ink);border-color:#F8DCC6}
+  .t-gold{background:var(--gold);color:var(--gold-ink);border-color:#F2E3B8}
+  .t-rose{background:var(--rose);color:var(--rose-ink);border-color:#F7D3D4}
+
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .g-13{display:grid;grid-template-columns:1fr 2fr;gap:18px}
+  .g2 .card,.g3 .card,.g-13 .card{margin-bottom:0}
+
+  /* cupom fiscal — assinatura */
+  .cupomcard{
+    background:#FFFDF7;border:1px solid #EFE6CE;border-radius:18px 18px 0 0;padding:20px 22px 26px;
+    position:relative;box-shadow:var(--sh);
+  }
+  .cupomcard:after{
+    content:"";position:absolute;left:0;right:0;bottom:-11px;height:12px;
+    background:
+      radial-gradient(circle at 6px 0, transparent 6px, #FFFDF7 6.5px) 0 0/12px 12px repeat-x;
+    filter:drop-shadow(0 1px 0 #EFE6CE);
+  }
+  .cupomcard .hd{text-align:center;border-bottom:1px dashed #D9CFB4;padding-bottom:11px;margin-bottom:13px}
+  .cupomcard .hd b{font-family:Outfit;font-size:14px;font-weight:800;letter-spacing:.04em;display:block}
+  .cupomcard .hd span{font:500 10.5px "IBM Plex Mono";color:#8B7F63}
+  .cupomcard .ln{display:flex;justify-content:space-between;font:500 12.5px "IBM Plex Mono";padding:4.5px 0;color:#4A4230}
+  .cupomcard .ln b{color:var(--ink);font-weight:700}
+  .cupomcard .tot{border-top:1px dashed #D9CFB4;margin-top:10px;padding-top:11px;display:flex;justify-content:space-between;align-items:baseline}
+  .cupomcard .tot span{font:700 11px Inter;letter-spacing:.12em;text-transform:uppercase;color:#8B7F63}
+  .cupomcard .tot b{font-family:Outfit;font-size:30px;font-weight:800;letter-spacing:-.02em}
+
+  /* ============ TABELAS ============ */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;font:700 10.5px Inter;letter-spacing:.06em;color:var(--dim);padding:12px 18px;
+    background:var(--line-2);border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:12px 18px;border-bottom:1px solid var(--line-2);color:var(--ink-2)}
+  tbody tr:hover td{background:#FBFDFC}
+  tbody tr:last-child td{border-bottom:none}
+  .r{text-align:right}.c{text-align:center}
+  td b{color:var(--ink)}
+
+  .who{display:flex;align-items:center;gap:10px}
+  .ava{width:32px;height:32px;border-radius:11px;display:grid;place-items:center;font:800 11px Outfit;color:#fff;flex:none}
+  .who .t b{display:block;font-size:12.5px;color:var(--ink);line-height:1.3}
+  .who .t span{font:500 10.5px "IBM Plex Mono";color:var(--dim)}
+
+  .pill{font:700 10.5px Inter;padding:4px 10px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .p-ok{background:var(--mint);color:var(--teal-ink)}
+  .p-warn{background:var(--pump);color:var(--pump-ink)}
+  .p-bad{background:var(--rose);color:var(--rose-ink)}
+  .p-info{background:var(--ice);color:var(--ice-ink)}
+  .p-gold{background:var(--gold);color:var(--gold-ink)}
+  .p-mute{background:var(--line-2);color:var(--dim)}
+
+  /* ============ BOTÕES / FORM ============ */
+  .btn{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:12px;
+    padding:10px 15px;font:700 12.5px Inter;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover:not(:disabled){background:var(--mint);border-color:var(--teal);color:var(--teal-ink)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.pri{background:var(--teal);border-color:var(--teal);color:#04231D;font-weight:800}
+  .btn.pri:hover:not(:disabled){background:#00cfa5;color:#04231D}
+  .btn.dark{background:var(--deep);border-color:var(--deep);color:#fff}
+  .btn.dark:hover{background:var(--deep-3);color:#fff}
+  .btn.sm{padding:7px 11px;font-size:11.5px;border-radius:9px}
+
+  .fld{margin-bottom:14px}
+  .fld label{display:block;font:700 11px Inter;color:var(--ink-2);margin-bottom:6px}
+  .fld input,.fld select{width:100%;background:var(--card);border:1px solid var(--line);color:var(--ink);
+    padding:11px 13px;border-radius:11px;font:500 13px Inter}
+  .fld input:disabled{background:var(--line-2);color:var(--dim)}
+  .fld input:focus,.fld select:focus{outline:2px solid var(--teal);outline-offset:-1px}
+  .fld .hint{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5}
+  .tok{font-family:"IBM Plex Mono",monospace!important;font-size:11.5px!important}
+
+  .alert{border-radius:13px;padding:13px 15px;font-size:12.5px;line-height:1.6;margin-bottom:12px;display:flex;gap:11px}
+  .alert .ai{font-size:15px;line-height:1.15;flex:none}
+  .a-ok{background:var(--mint);color:#05604E}
+  .a-warn{background:var(--pump);color:#8F3D08}
+  .a-bad{background:var(--rose);color:#96262B}
+  .a-info{background:var(--ice);color:#134B90}
+  .alert b{font-weight:800}
+  .alert:last-child{margin-bottom:0}
+
+  .drop{border:2px dashed #CFDCD8;border-radius:16px;padding:34px;text-align:center;cursor:pointer;transition:.15s;background:var(--line-2)}
+  .drop:hover{border-color:var(--teal);background:var(--mint)}
+  .drop .ic{font-size:30px;margin-bottom:9px}
+  .drop b{display:block;font-family:Outfit;font-size:15px;font-weight:700;margin-bottom:4px;color:var(--ink)}
+  .drop span{font-size:12px;color:var(--dim)}
+
+  .steps{display:flex;gap:6px;padding:15px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;background:var(--line-2)}
+  .step{display:flex;align-items:center;gap:8px;font:700 12px Inter;color:var(--dim)}
+  .step .n{width:22px;height:22px;border-radius:50%;background:#DDE6E4;display:grid;place-items:center;font-size:10px}
+  .step.on{color:var(--teal-ink)}.step.on .n{background:var(--teal);color:#04231D}
+  .step.done .n{background:var(--mint);color:var(--teal-ink)}
+  .step:not(:last-child):after{content:"→";margin-left:5px;opacity:.35}
+
+  .depara{display:grid;grid-template-columns:1fr 22px 1fr 96px;gap:11px;align-items:center;
+    padding:12px 0;border-bottom:1px solid var(--line-2);font-size:12.5px}
+  .depara .from b{font-size:12.5px}
+  .depara .from span{font:500 11px "IBM Plex Mono";color:var(--dim)}
+  .depara .arrow{text-align:center;color:var(--teal);font-weight:800}
+  .depara select{width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font:500 12px Inter}
+  .dphead{display:grid;grid-template-columns:1fr 22px 1fr 96px;gap:11px;font:700 10.5px Inter;
+    color:var(--dim);padding-bottom:10px;border-bottom:1px solid var(--line)}
+
+  .hw{display:flex;align-items:center;gap:13px;padding:14px 18px;border-bottom:1px solid var(--line-2)}
+  .hw:last-child{border-bottom:none}
+  .hw .ic{width:40px;height:40px;border-radius:12px;background:var(--line-2);display:grid;place-items:center;font-size:17px;flex:none}
+  .hw .t{flex:1}.hw .t b{display:block;font-size:13px;color:var(--ink)}.hw .t span{font-size:11.5px;color:var(--dim)}
+
+  .acq{border:1px solid var(--line);border-radius:14px;margin-bottom:11px;overflow:hidden}
+  .acq .top2{display:flex;align-items:center;gap:12px;padding:13px 15px;cursor:pointer;transition:.15s}
+  .acq .top2:hover{background:var(--line-2)}
+  .acq .lg{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font:800 11px Outfit;color:#fff;flex:none}
+  .acq .nm{flex:1}.acq .nm b{display:block;font-size:13.5px}.acq .nm span{font-size:11px;color:var(--dim)}
+  .acq .bd{display:none;padding:16px;border-top:1px solid var(--line);background:var(--line-2)}
+  .acq.open .bd{display:block}
+
+  .lg-list{display:flex;flex-direction:column;gap:2px}
+  .lgi{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:12.5px}
+  .lgi:last-child{border-bottom:none}
+  .lgi .t{flex:1}
+  .lgi .mk{width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font-size:12px;flex:none}
+
+  .bar{height:7px;background:var(--line-2);border-radius:20px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--teal);border-radius:20px;transition:width .35s}
+
+  /* modais */
+  .veil{position:fixed;inset:0;background:rgba(11,59,54,.4);backdrop-filter:blur(4px);display:none;place-items:center;z-index:60;padding:18px}
+  .veil.show{display:grid}
+  .modal{width:100%;max-width:580px;max-height:90vh;overflow:auto;background:var(--card);border-radius:22px;
+    box-shadow:0 30px 70px rgba(11,59,54,.3);animation:rise .2s}
+  @keyframes rise{from{transform:translateY(12px);opacity:0}}
+  .modal .mh{padding:20px 22px;border-bottom:1px solid var(--line)}
+  .modal .mh .t{font-family:Outfit;font-size:19px;font-weight:800;letter-spacing:-.02em}
+  .modal .mb{padding:22px}
+  .modal .mf{display:flex;gap:10px;justify-content:flex-end;padding:0 22px 22px}
+
+  .proc{text-align:center;padding:42px 20px}
+  .spin{width:36px;height:36px;border-radius:50%;margin:0 auto 15px;border:3px solid var(--line);border-top-color:var(--teal);animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .proc .big{font-family:Outfit;font-size:16px;font-weight:700;margin-bottom:5px}
+  .proc .sm{font-size:12px;color:var(--dim)}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--deep);color:#fff;
+    padding:14px 20px;border-radius:14px;font:600 13px Inter;opacity:0;transition:.25s;z-index:90;
+    box-shadow:0 16px 38px rgba(11,59,54,.34);max-width:92vw}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.warn{background:#8F3D08}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);font-weight:600}
+  .legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:6px}
+
+  @media(max-width:1080px){
+    .shell{grid-template-columns:1fr}
+    .side{position:static;min-height:0}
+    .side nav{flex-direction:row;flex-wrap:wrap}
+    .countdown{display:none}
+    .g2,.g3,.g-13{grid-template-columns:1fr}
+    .depara,.dphead{grid-template-columns:1fr}
+  }
+</style>
+
+<div class="shell">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="side">
+    <div class="logo">
+      <svg width="30" height="30" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="18" fill="none" stroke="#00B894" stroke-width="2" opacity=".45"/>
+        <path d="M8 25c5 0 5-10 10-10s5 10 10 10 4-4 4-4" fill="none" stroke="#00B894" stroke-width="3.6" stroke-linecap="round"/>
+        <path d="M8 17c5 0 5-6 10-6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".55"/>
+      </svg>
+      <div class="bn">FLUIR<small>RETAGUARDA</small></div>
+    </div>
+
+    <div class="mlabel">Loja</div>
+    <nav id="nav1">
+      <button class="on" data-v="painel"><span class="ic">◱</span> Painel</button>
+      <button data-v="entrada"><span class="ic">⇩</span> Entrada de NF</button>
+      <button data-v="produtos"><span class="ic">▦</span> Produtos</button>
+      <button data-v="fornec"><span class="ic">⛟</span> Fornecedores</button>
+      <button data-v="pagar"><span class="ic">₪</span> Contas a pagar <span class="tag" id="navPagar">4</span></button>
+      <button data-v="rel"><span class="ic">◔</span> Relatórios</button>
+    </nav>
+
+    <hr>
+    <div class="mlabel">Escritório</div>
+    <nav id="nav2">
+      <button data-v="contador"><span class="ic">▤</span> Contador</button>
+      <button data-v="config"><span class="ic">⚙</span> Configurações</button>
+      <button data-v="users"><span class="ic">☺</span> Usuários</button>
+    </nav>
+
+    <div class="countdown">
+      <div class="l">Prazo IN 87 · Sefaz-CE</div>
+      <div class="n">79</div>
+      <div class="d">dias até 3 de novembro<br>para vincular pagamento à nota</div>
+      <div class="bar"><i></i></div>
+    </div>
+  </aside>
+
+  <!-- ================= CONTEÚDO ================= -->
+  <div class="main">
+
+    <div class="top">
+      <div>
+        <h1 id="pgTitle">Painel</h1>
+        <div class="crumb" id="pgCrumb">Mercantil Santo Expedito · Caucaia/CE · domingo, 16 de agosto</div>
+      </div>
+      <div class="right">
+        <button class="iconbtn" title="Buscar">⌕</button>
+        <button class="iconbtn" title="Avisos">◔<span class="dot"></span></button>
+        <div class="me"><div class="av">MG</div><div class="t"><b>Maria Georgina</b><span>Proprietária</span></div></div>
+      </div>
+    </div>
+
+    <!-- ============ PAINEL ============ -->
+    <section class="view on" id="v-painel">
+      <div class="tiles">
+        <div class="tile t-mint"><div class="l">Venda hoje</div><div class="v">R$ 4.128</div><div class="d">▲ 6% vs domingo passado</div></div>
+        <div class="tile t-ice"><div class="l">Cupons</div><div class="v">309</div><div class="d">ticket médio R$ 13,36</div></div>
+        <div class="tile t-pump"><div class="l">Margem bruta</div><div class="v">22,4%</div><div class="d">▼ 1,6 p.p. da meta</div></div>
+        <div class="tile t-gold"><div class="l">Mês até agora</div><div class="v">R$ 96,4 mil</div><div class="d">projeção R$ 128 mil</div></div>
+      </div>
+
+      <div class="g-13">
+        <div class="cupomcard">
+          <div class="hd">
+            <b>RESUMO DO DIA</b>
+            <span>16/08/2026 · CAIXA 01</span>
+          </div>
+          <div class="ln"><span>Vendas</span><b>309</b></div>
+          <div class="ln"><span>Dinheiro</span><b>743,04</b></div>
+          <div class="ln"><span>Pix</span><b>1.114,56</b></div>
+          <div class="ln"><span>Débito</span><b>1.403,52</b></div>
+          <div class="ln"><span>Crédito</span><b>866,88</b></div>
+          <div class="ln"><span>Sangrias</span><b>-900,00</b></div>
+          <div class="ln"><span>NFC-e emitidas</span><b>309</b></div>
+          <div class="ln"><span>Em contingência</span><b>0</b></div>
+          <div class="tot"><span>Total</span><b>R$ 4.128,00</b></div>
+        </div>
+
+        <div class="card">
+          <h4>Vendas da semana <em>seg a dom</em></h4>
+          <div class="pad" id="chartWeek"></div>
+        </div>
+      </div>
+
+      <div style="height:18px"></div>
+
+      <div class="g2">
+        <div class="card">
+          <h4>Faturamento e margem <em>últimos 30 dias</em></h4>
+          <div class="pad" id="chartTrend"></div>
+        </div>
+        <div class="card">
+          <h4>Como o cliente paga <em>este mês</em></h4>
+          <div class="pad" id="chartPay"></div>
+        </div>
+      </div>
+
+      <div style="height:18px"></div>
+
+      <div class="g2">
+        <div class="card">
+          <h4>Movimento por hora <em>média do mês</em></h4>
+          <div class="pad" id="chartHour"></div>
+        </div>
+        <div class="card">
+          <h4>Precisa da sua atenção <em>3 pendências</em></h4>
+          <div class="pad">
+            <div class="alert a-bad"><span class="ai">!</span><div><b>3 produtos com margem negativa.</b> O custo subiu na última entrada e o preço de venda não acompanhou.</div></div>
+            <div class="alert a-warn"><span class="ai">◷</span><div><b>12 itens vencem em 5 dias.</b> R$ 198 em risco — uma promoção de 30% recupera R$ 142.</div></div>
+            <div class="alert a-info"><span class="ai">◈</span><div><b>Certificado digital vence em 38 dias.</b> Renove antes de 23 de setembro para não parar de emitir nota.</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ENTRADA DE NF ============ -->
+    <section class="view" id="v-entrada">
+      <div id="entradaStart">
+        <div class="g2">
+          <div class="card">
+            <h4>Importar XML <em>caminho recomendado</em></h4>
+            <div class="pad">
+              <div class="drop" id="dropXml"><div class="ic">📄</div><b>Arraste o XML da nota aqui</b><span>ou clique para selecionar</span></div>
+              <div class="fld" style="margin:15px 0 0"><label>Buscar pela chave de acesso</label><input class="tok" placeholder="44 dígitos"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h4>Ler DANFE em PDF <em>leitura assistida</em></h4>
+            <div class="pad">
+              <div class="drop" id="dropPdf"><div class="ic">🧾</div><b>Arraste o DANFE em PDF</b><span>quando o fornecedor não mandou o XML</span></div>
+              <div class="alert a-warn" style="margin-top:15px"><span class="ai">◷</span><div>O PDF é lido por reconhecimento de texto e sempre pede conferência. Peça o XML sempre que puder: ele é exato e vale como documento fiscal.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="entradaProc" style="display:none">
+        <div class="card"><div class="proc">
+          <div class="spin"></div>
+          <div class="big" id="procTxt">Lendo o arquivo…</div>
+          <div class="sm" id="procSub">Extraindo emitente, itens, impostos e duplicatas</div>
+          <div class="bar" style="max-width:320px;margin:20px auto 0"><i id="procBar" style="width:5%"></i></div>
+        </div></div>
+      </div>
+
+      <div id="entradaWiz" style="display:none">
+        <div class="card">
+          <div class="steps">
+            <div class="step on" data-s="1"><span class="n">1</span> Fornecedor</div>
+            <div class="step" data-s="2"><span class="n">2</span> Produtos</div>
+            <div class="step" data-s="3"><span class="n">3</span> Financeiro</div>
+            <div class="step" data-s="4"><span class="n">4</span> Conferência</div>
+          </div>
+
+          <div class="pad wstep" data-s="1">
+            <div class="alert a-ok"><span class="ai">✓</span><div><b>Fornecedor novo, cadastrado a partir da nota.</b> Os dados abaixo vieram do XML — ninguém digitou.</div></div>
+            <div class="g2">
+              <div class="fld"><label>Razão social</label><input value="Distribuidora Norte Nordeste Ltda"></div>
+              <div class="fld"><label>CNPJ</label><input class="tok" value="07.412.885/0001-30"></div>
+              <div class="fld"><label>Inscrição estadual</label><input class="tok" value="06.221.447-9"></div>
+              <div class="fld"><label>Município e UF</label><input value="Maracanaú / CE"></div>
+              <div class="fld"><label>Condição de pagamento</label><input value="28 / 42 / 56 dias"></div>
+              <div class="fld"><label>Contato do vendedor</label><input placeholder="telefone ou e-mail"></div>
+            </div>
+            <div class="alert a-warn"><span class="ai">◷</span><div>Confira o prazo. Ele passa a valer como padrão nas próximas notas deste fornecedor.</div></div>
+          </div>
+
+          <div class="pad wstep" data-s="2" style="display:none">
+            <div class="alert a-ok"><span class="ai">✓</span><div><b>4 de 6 itens reconhecidos sozinhos</b> pelo vínculo criado em entradas anteriores. Confira os 2 restantes.</div></div>
+            <div class="dphead"><div>Descrição no XML</div><div></div><div>Produto na loja</div><div class="r">Custo un.</div></div>
+            <div id="deparaList"></div>
+            <div class="alert a-bad" style="margin-top:16px"><span class="ai">!</span><div><b>Margem em risco:</b> o custo do Leite Itambé subiu de R$ 3,98 para R$ 4,42, alta de 11%. Com o preço atual de R$ 5,49 a margem cai para 19,5%. Preço sugerido: <b>R$ 5,99</b>.</div></div>
+          </div>
+
+          <div class="pad wstep" data-s="3" style="display:none">
+            <div class="alert a-ok"><span class="ai">✓</span><div><b>3 duplicatas encontradas no XML.</b> Os títulos entram no contas a pagar já ligados a esta nota.</div></div>
+            <div class="card" style="margin:0;box-shadow:none">
+              <table>
+                <thead><tr><th>Parcela</th><th>Vencimento</th><th class="r">Valor</th><th>Categoria</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">001</td><td class="mono">13/09/2026</td><td class="r mono"><b>1.439,63</b></td><td>Mercadoria para revenda</td></tr>
+                  <tr><td class="mono">002</td><td class="mono">27/09/2026</td><td class="r mono"><b>1.439,63</b></td><td>Mercadoria para revenda</td></tr>
+                  <tr><td class="mono">003</td><td class="mono">11/10/2026</td><td class="r mono"><b>1.439,64</b></td><td>Mercadoria para revenda</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="g2" style="margin-top:16px">
+              <div class="fld"><label>Conta financeira</label><select><option>Caixa da loja</option><option>Banco do Brasil · 12.443-7</option><option>Mercado Pago</option></select></div>
+              <div class="fld"><label>Centro de custo</label><select><option>Mercearia</option><option>Hortifruti</option><option>Açougue</option><option>Bebidas</option></select></div>
+            </div>
+          </div>
+
+          <div class="pad wstep" data-s="4" style="display:none">
+            <div class="tiles" style="margin-bottom:16px">
+              <div class="tile t-ice"><div class="l">Itens</div><div class="v">6</div><div class="d">312 unidades</div></div>
+              <div class="tile t-mint"><div class="l">Valor da nota</div><div class="v">4.318,90</div><div class="d">ICMS-ST R$ 218,40</div></div>
+              <div class="tile t-pump"><div class="l">Títulos a criar</div><div class="v">3</div><div class="d">primeiro em 13/09</div></div>
+            </div>
+            <div class="alert a-ok"><span class="ai">✓</span><div>Ao confirmar, o sistema cadastra o fornecedor, dá entrada de 312 unidades no estoque, recalcula o custo médio, cria 3 títulos no contas a pagar e envia o catálogo atualizado para o caixa.</div></div>
+          </div>
+
+          <div class="pad" style="border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;background:var(--line-2)">
+            <button class="btn" id="wizCancel">Cancelar</button>
+            <button class="btn" id="wizBack" style="display:none">Voltar</button>
+            <button class="btn pri" id="wizNext">Continuar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PRODUTOS ============ -->
+    <section class="view" id="v-produtos">
+      <div class="card">
+        <h4>Cadastro <em id="prodCount"></em></h4>
+        <div class="pad" style="padding-bottom:0;display:flex;gap:10px;flex-wrap:wrap">
+          <div class="fld" style="flex:1;min-width:220px;margin-bottom:14px"><input id="pq" placeholder="Buscar por nome ou código"></div>
+          <button class="btn" style="height:41px">Seção</button>
+          <button class="btn" style="height:41px">Margem</button>
+        </div>
+        <table id="prodTbl"></table>
+      </div>
+    </section>
+
+    <!-- ============ FORNECEDORES ============ -->
+    <section class="view" id="v-fornec">
+      <div class="card"><h4>Cadastro <em id="fornCount"></em></h4><table id="fornTbl"></table></div>
+    </section>
+
+    <!-- ============ CONTAS A PAGAR ============ -->
+    <section class="view" id="v-pagar">
+      <div class="tiles">
+        <div class="tile t-rose"><div class="l">Vence hoje</div><div class="v" id="kHoje">0</div><div class="d" id="kHojeN">—</div></div>
+        <div class="tile t-pump"><div class="l">Próximos 7 dias</div><div class="v" id="k7">0</div><div class="d" id="k7n">—</div></div>
+        <div class="tile t-ice"><div class="l">Total em aberto</div><div class="v" id="kAb">0</div><div class="d" id="kAbN">—</div></div>
+        <div class="tile t-mint"><div class="l">Pago no mês</div><div class="v" id="kPg">0</div><div class="d">baixas registradas</div></div>
+      </div>
+      <div class="card">
+        <h4>Títulos <em><button class="btn sm pri" id="novoTit">+ Novo título</button></em></h4>
+        <table id="pagarTbl"></table>
+      </div>
+    </section>
+
+    <!-- ============ RELATÓRIOS ============ -->
+    <section class="view" id="v-rel">
+      <div class="g2">
+        <div class="card">
+          <h4>Curva ABC <em>por faturamento, 30 dias</em></h4>
+          <table>
+            <thead><tr><th class="c">Cl.</th><th>Produto</th><th class="r">Faturamento</th><th class="r">Margem</th><th class="r">% acum.</th></tr></thead>
+            <tbody>
+              <tr><td class="c"><span class="pill p-ok">A</span></td><td><b>Refrigerante Coca-Cola 2L</b></td><td class="r mono">4.180</td><td class="r mono">18,2%</td><td class="r mono">12,4%</td></tr>
+              <tr><td class="c"><span class="pill p-ok">A</span></td><td><b>Alcatra bovina</b></td><td class="r mono">3.905</td><td class="r mono">14,8%</td><td class="r mono">24,0%</td></tr>
+              <tr><td class="c"><span class="pill p-ok">A</span></td><td><b>Arroz Tio João 5kg</b></td><td class="r mono">3.220</td><td class="r mono">11,4%</td><td class="r mono">33,6%</td></tr>
+              <tr><td class="c"><span class="pill p-warn">B</span></td><td><b>Leite Integral Itambé 1L</b></td><td class="r mono">1.870</td><td class="r mono" style="color:var(--bad)">−2,1%</td><td class="r mono">39,1%</td></tr>
+              <tr><td class="c"><span class="pill p-warn">B</span></td><td><b>Café Santa Clara 250g</b></td><td class="r mono">1.540</td><td class="r mono">26,9%</td><td class="r mono">43,7%</td></tr>
+              <tr><td class="c"><span class="pill p-mute">C</span></td><td><b>Detergente Ypê Neutro</b></td><td class="r mono">410</td><td class="r mono">31,0%</td><td class="r mono">88,2%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>Taxas de cartão <em>quanto a maquininha reteve</em></h4>
+          <div class="pad" id="chartFees"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CONTADOR ============ -->
+    <section class="view" id="v-contador">
+      <div class="card" style="background:linear-gradient(135deg,var(--deep-2),var(--deep));border:none;color:#fff">
+        <div class="pad" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div class="ava" style="width:46px;height:46px;background:var(--teal);color:#04231D;font-size:14px">NC</div>
+          <div style="flex:1;min-width:200px">
+            <div style="font-family:Outfit;font-size:17px;font-weight:800">Nunes Contabilidade</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.7)">Acesso somente leitura · entra com o próprio login · não vê custo nem margem</div>
+          </div>
+          <button class="btn pri" id="btnConvite">Convidar por link</button>
+        </div>
+      </div>
+
+      <div class="tiles">
+        <div class="tile t-mint"><div class="l">NFC-e do mês</div><div class="v">8.412</div><div class="d">todas autorizadas</div></div>
+        <div class="tile t-ice"><div class="l">Notas de entrada</div><div class="v">42</div><div class="d">XML guardado</div></div>
+        <div class="tile t-pump"><div class="l">Divergências</div><div class="v">2</div><div class="d">precisam de decisão</div></div>
+        <div class="tile t-gold"><div class="l">Fechamento</div><div class="v">1º/09</div><div class="d">envio automático</div></div>
+      </div>
+
+      <div class="g2">
+        <div class="card">
+          <h4>Cruzamento cartão × nota <em>o mesmo que a Sefaz faz</em></h4>
+          <div class="pad">
+            <div class="alert a-ok"><span class="ai">✓</span><div>Tudo que passou nas maquininhas em agosto está amarrado a uma nota. <b>Nenhum risco de malha.</b></div></div>
+            <div class="pad" id="chartMatch" style="padding:6px 0 0"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Divergências para resolver <em>antes de fechar o mês</em></h4>
+          <div class="pad">
+            <div class="lg-list">
+              <div class="lgi"><div class="mk" style="background:var(--pump);color:var(--pump-ink)">!</div>
+                <div class="t"><b>2 notas emitidas em contingência</b><div style="font-size:11px;color:var(--dim)">Transmitidas fora do prazo, com código 150. Precisam de justificativa.</div></div>
+                <button class="btn sm">Ver</button></div>
+              <div class="lgi"><div class="mk" style="background:var(--mint);color:var(--teal-ink)">✓</div>
+                <div class="t"><b>Numeração sem falhas</b><div style="font-size:11px;color:var(--dim)">Sequência 9.104 a 17.516, sem número pulado.</div></div>
+                <span class="pill p-ok">ok</span></div>
+              <div class="lgi"><div class="mk" style="background:var(--mint);color:var(--teal-ink)">✓</div>
+                <div class="t"><b>Nenhuma nota rejeitada em aberto</b><div style="font-size:11px;color:var(--dim)">3 rejeições no mês, todas reemitidas.</div></div>
+                <span class="pill p-ok">ok</span></div>
+              <div class="lgi"><div class="mk" style="background:var(--ice);color:var(--ice-ink)">i</div>
+                <div class="t"><b>4 entradas sem XML</b><div style="font-size:11px;color:var(--dim)">Compras em atacarejo lançadas por cupom. Anexo disponível.</div></div>
+                <button class="btn sm">Ver</button></div>
+              <div class="lgi"><div class="mk" style="background:var(--mint);color:var(--teal-ink)">✓</div>
+                <div class="t"><b>Inventário do mês fechado</b><div style="font-size:11px;color:var(--dim)">Contagem de 31/07 conferida.</div></div>
+                <span class="pill p-ok">ok</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:18px"></div>
+
+      <div class="g2">
+        <div class="card">
+          <h4>Separação de impostos <em>Simples Nacional</em></h4>
+          <div class="pad">
+            <div class="alert a-info"><span class="ai">i</span><div>Boa parte do mix do mercadinho é substituição tributária e monofásico. <b>Sem separar isso, a loja paga imposto duas vezes.</b></div></div>
+            <div class="pad" id="chartTax" style="padding:4px 0 0"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Pacote do mês <em>tudo em um arquivo</em></h4>
+          <div class="pad">
+            <table style="margin:-6px -18px 0;width:calc(100% + 36px)">
+              <tbody>
+                <tr><td>XMLs de saída, autorizadas e canceladas</td><td class="r"><span class="pill p-ok">8.412</span></td></tr>
+                <tr><td>XMLs de entrada</td><td class="r"><span class="pill p-ok">42</span></td></tr>
+                <tr><td>Vendas por CFOP, CST e NCM</td><td class="r"><span class="pill p-ok">pronto</span></td></tr>
+                <tr><td>Separação de ST e monofásico</td><td class="r"><span class="pill p-ok">pronto</span></td></tr>
+                <tr><td>Meios de pagamento por nota</td><td class="r"><span class="pill p-ok">pronto</span></td></tr>
+                <tr><td>Inutilizações e contingências</td><td class="r"><span class="pill p-warn">2</span></td></tr>
+                <tr><td>Livro de inventário</td><td class="r"><span class="pill p-ok">pronto</span></td></tr>
+                <tr><td>Contas pagas e recebidas</td><td class="r"><span class="pill p-ok">pronto</span></td></tr>
+              </tbody>
+            </table>
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+              <button class="btn pri" id="btnPacote">Gerar pacote de agosto</button>
+              <button class="btn" id="btnEnviar">Enviar por e-mail</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:18px"></div>
+
+      <div class="card">
+        <h4>Pacotes anteriores <em>guardados por 5 anos</em></h4>
+        <table>
+          <thead><tr><th>Mês</th><th>Gerado em</th><th class="r">NFC-e</th><th class="r">Entradas</th><th class="c">Situação</th><th class="r">Arquivo</th></tr></thead>
+          <tbody>
+            <tr><td><b>Julho 2026</b></td><td class="mono">01/08/2026 03:12</td><td class="r mono">8.104</td><td class="r mono">39</td><td class="c"><span class="pill p-ok">enviado</span></td><td class="r"><button class="btn sm">Baixar</button></td></tr>
+            <tr><td><b>Junho 2026</b></td><td class="mono">01/07/2026 03:09</td><td class="r mono">7.980</td><td class="r mono">44</td><td class="c"><span class="pill p-ok">enviado</span></td><td class="r"><button class="btn sm">Baixar</button></td></tr>
+            <tr><td><b>Maio 2026</b></td><td class="mono">01/06/2026 03:11</td><td class="r mono">8.221</td><td class="r mono">41</td><td class="c"><span class="pill p-ok">enviado</span></td><td class="r"><button class="btn sm">Baixar</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ CONFIGURAÇÕES ============ -->
+    <section class="view" id="v-config">
+      <div class="g2">
+        <div class="card">
+          <h4>Equipamentos do caixa 01 <em>tudo conectado</em></h4>
+          <div class="hw"><div class="ic">⚖</div><div class="t"><b>Balança do caixa</b><span>Toledo Prix 5 · COM3 · 9600 8N1</span></div><span class="pill p-ok">conectada</span></div>
+          <div class="hw"><div class="ic">🏷</div><div class="t"><b>Balança de etiqueta</b><span>Toledo Prix 4 Uno · rede 192.168.0.42</span></div><span class="pill p-ok">conectada</span></div>
+          <div class="hw"><div class="ic">🖨</div><div class="t"><b>Impressora do cupom</b><span>Epson TM-T20X · USB · 80 mm</span></div><span class="pill p-ok">pronta</span></div>
+          <div class="hw"><div class="ic">📷</div><div class="t"><b>Leitor de código</b><span>Elgin Flash · emulação de teclado</span></div><span class="pill p-ok">ativo</span></div>
+          <div class="hw"><div class="ic">💰</div><div class="t"><b>Gaveta de dinheiro</b><span>abre pela impressora</span></div><span class="pill p-ok">ok</span></div>
+        </div>
+
+        <div class="card">
+          <h4>Ajustes da balança</h4>
+          <div class="pad">
+            <div class="g2">
+              <div class="fld"><label>Marca</label><select><option>Toledo</option><option>Filizola</option><option>Urano</option><option>Elgin</option><option>Welmy</option></select></div>
+              <div class="fld"><label>Modelo</label><select><option>Prix 5</option><option>Prix 4 Uno</option><option>Prix 3 Fit</option></select></div>
+              <div class="fld"><label>Porta</label><select><option>COM3</option><option>COM1</option><option>USB</option><option>Rede</option></select></div>
+              <div class="fld"><label>Velocidade</label><select><option>9600</option><option>4800</option><option>19200</option></select></div>
+            </div>
+            <div class="fld"><label>Formato do peso</label>
+              <select><option>Toledo padrão (9091)</option><option>Filizola Platina</option><option>Urano UDC</option><option>Genérico ASCII</option></select>
+              <div class="hint">Cada modelo manda o peso de um jeito. O formato fica aqui, não no código — trocar de balança não exige nova versão do sistema.</div>
+            </div>
+            <div class="fld"><label>Etiqueta pesável</label>
+              <select><option>2 + PLU(4) + peso em gramas(5) + dígito</option><option>2 + PLU(5) + valor(5) + dígito</option><option>2 + PLU(6) + peso(4) + dígito</option></select></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn" id="btnTestScale">Testar leitura</button>
+              <button class="btn" id="btnCargaPlu">Enviar catálogo para a balança</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:18px"></div>
+
+      <div class="card">
+        <h4>Maquininhas <em>clique para abrir</em></h4>
+        <div class="pad" id="acqList"></div>
+        <div class="pad" style="padding-top:0">
+          <div class="alert a-warn"><span class="ai">🔒</span><div><b>As chaves ficam na nuvem, nunca no computador da loja.</b> O caixa pede “cobrar R$ X” ao servidor, e o servidor fala com a maquininha. Se o computador for roubado, nenhuma senha vai junto.</div></div>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card">
+          <h4>Nota fiscal</h4>
+          <div class="pad">
+            <div class="g2">
+              <div class="fld"><label>Certificado digital</label><input value="MARIA GEORGINA…31023087"></div>
+              <div class="fld"><label>Regime</label><select><option>Simples Nacional</option><option>Lucro Presumido</option></select></div>
+              <div class="fld"><label>Série</label><input class="tok" value="001"></div>
+              <div class="fld"><label>Próximo número</label><input class="tok" value="17996"></div>
+              <div class="fld"><label>CSC / Token</label><input class="tok" value="000001"></div>
+              <div class="fld"><label>Ambiente</label><select><option>Produção</option><option>Homologação</option></select></div>
+            </div>
+            <div class="alert a-ok"><span class="ai">✓</span><div>Contingência automática ligada · reenvio em até 24 h · conciliação de pagamento (ECONF) ativa.</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Nuvem e caixa</h4>
+          <div class="pad">
+            <div class="g2">
+              <div class="fld"><label>Conferir catálogo</label><select><option>a cada 60 segundos</option><option>a cada 30 segundos</option><option>a cada 5 minutos</option></select></div>
+              <div class="fld"><label>Conferência completa</label><select><option>todo dia às 03:00</option><option>todo dia às 05:00</option></select></div>
+            </div>
+            <div class="alert a-ok"><span class="ai">✓</span><div><b>Preço novo entra só entre uma venda e outra.</b> Venda aberta trabalha com o preço do momento em que começou.</div></div>
+            <table style="margin:0 -18px -18px;width:calc(100% + 36px)">
+              <tbody>
+                <tr><td>Vendas esperando subir</td><td class="r"><span class="pill p-ok">nenhuma</span></td></tr>
+                <tr><td>NFC-e esperando envio</td><td class="r"><span class="pill p-ok">nenhuma</span></td></tr>
+                <tr><td>Último contato do caixa</td><td class="r mono">há 4 segundos</td></tr>
+                <tr><td>Cópia de segurança</td><td class="r"><span class="pill p-ok">contínua</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ USUÁRIOS ============ -->
+    <section class="view" id="v-users">
+      <div class="card">
+        <h4>Quem tem acesso <em>4 pessoas</em></h4>
+        <table>
+          <thead><tr><th>Pessoa</th><th>Perfil</th><th>Pode acessar</th><th class="r">Desconto até</th></tr></thead>
+          <tbody>
+            <tr><td><div class="who"><div class="ava" style="background:var(--teal-ink)">MG</div><div class="t"><b>Maria Georgina</b><span>proprietária</span></div></div></td><td><span class="pill p-ok">Proprietária</span></td><td>Tudo</td><td class="r mono">sem limite</td></tr>
+            <tr><td><div class="who"><div class="ava" style="background:var(--ice-ink)">JS</div><div class="t"><b>Jocélia Souza</b><span>gerente</span></div></div></td><td><span class="pill p-info">Gerente</span></td><td>Caixa, estoque, entrada de nota</td><td class="r mono">10%</td></tr>
+            <tr><td><div class="who"><div class="ava" style="background:var(--pump-ink)">AC</div><div class="t"><b>Antônio Célio</b><span>operador</span></div></div></td><td><span class="pill p-warn">Caixa</span></td><td>Só a frente de caixa</td><td class="r mono">3%</td></tr>
+            <tr><td><div class="who"><div class="ava" style="background:var(--gold-ink)">NC</div><div class="t"><b>Nunes Contabilidade</b><span>escritório</span></div></div></td><td><span class="pill p-gold">Contador</span></td><td>Só leitura fiscal</td><td class="r mono">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="g2">
+        <div class="card">
+          <h4>O que pede senha do supervisor</h4>
+          <table>
+            <tbody>
+              <tr><td>Cancelar item já registrado</td><td class="r"><span class="pill p-ok">pede</span></td></tr>
+              <tr><td>Cancelar a venda inteira</td><td class="r"><span class="pill p-ok">pede</span></td></tr>
+              <tr><td>Desconto acima do limite</td><td class="r"><span class="pill p-ok">pede</span></td></tr>
+              <tr><td>Sangria e reforço</td><td class="r"><span class="pill p-ok">pede</span></td></tr>
+              <tr><td>Mudar preço de venda</td><td class="r"><span class="pill p-ok">pede</span></td></tr>
+              <tr><td>Apagar movimento de estoque</td><td class="r"><span class="pill p-ok">pede</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4>O que aconteceu hoje <em>registro permanente</em></h4>
+          <table>
+            <thead><tr><th>Hora</th><th>Quem</th><th>O quê</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">09:12</td><td><b>Jocélia</b></td><td>Mudou o preço do Leite Itambé: 5,49 → 5,99</td></tr>
+              <tr><td class="mono">08:47</td><td><b>Antônio</b></td><td>Cancelou um item, liberado por Jocélia</td></tr>
+              <tr><td class="mono">08:02</td><td><b>Antônio</b></td><td>Abriu o caixa com fundo de R$ 150,00</td></tr>
+              <tr><td class="mono">07:55</td><td><b>Georgina</b></td><td>Lançou a nota de entrada 18.442</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="veil" id="veilTit"><div class="modal" style="max-width:540px">
+  <div class="mh"><div class="t" id="titTitle">Novo título</div></div>
+  <div class="mb" id="titBody"></div>
+  <div class="mf"><button class="btn" id="titCancel">Cancelar</button><button class="btn pri" id="titOk">Salvar</button></div>
+</div></div>
+
+<div class="veil" id="veilPreco"><div class="modal" style="max-width:540px">
+  <div class="mh"><div class="t">Mudar o preço de venda</div></div>
+  <div class="mb" id="precoBody"></div>
+  <div class="mf"><button class="btn" id="precoCancel">Cancelar</button><button class="btn pri" id="precoOk">Salvar e enviar ao caixa</button></div>
+</div></div>
+
+<div class="veil" id="veilConvite"><div class="modal" style="max-width:520px">
+  <div class="mh"><div class="t">Convidar o contador</div></div>
+  <div class="mb">
+    <div class="alert a-info"><span class="ai">i</span><div>O contador entra com o próprio login, vê só a parte fiscal e baixa o pacote do mês sozinho. Ele não vê custo, margem nem lucro.</div></div>
+    <div class="fld"><label>E-mail do escritório</label><input value="fiscal@nunescontabilidade.com.br"></div>
+    <div class="fld"><label>Link de acesso</label><input class="tok" value="fluir.app/c/santoexpedito-7f2a" disabled></div>
+    <div class="fld" style="margin-bottom:0"><label>Enviar o pacote todo mês</label>
+      <select><option>Sim, no dia 1º às 03:00</option><option>Não, só quando eu gerar</option></select></div>
+  </div>
+  <div class="mf"><button class="btn" id="convCancel">Fechar</button><button class="btn pri" id="convOk">Enviar convite</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const brl=n=>n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const parseN=v=>{const n=parseFloat(String(v).replace(/\./g,"").replace(",","."));return isNaN(n)?0:n};
+const openM=e=>e.classList.add("show"),closeM=e=>e.classList.remove("show");
+let tT;function toast(m,w){const t=$("toast");t.textContent=m;t.classList.toggle("warn",!!w);
+  t.classList.add("show");clearTimeout(tT);tT=setTimeout(()=>t.classList.remove("show"),3800)}
+const C={teal:"#00B894",tealInk:"#007A63",ice:"#4C91E8",pump:"#E8890C",gold:"#D9AE28",rose:"#D6444A",
+  line:"#E7EDEB",dim:"#7A8C89",ink:"#12211F",mint:"#DEF5EE"};
+const AV=["#007A63","#1B62B8","#C25A15","#8A6A08","#C0393D","#0B3B36"];
+const ini=s=>s.replace(/[^A-Za-zÀ-ú ]/g,"").split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+
+/* ============ GRÁFICOS (SVG à mão) ============ */
+function barChart(el,data,opts){
+  const w=560,h=210,pl=44,pb=26,pt=26;
+  const max=Math.max(...data.map(d=>d.v))*1.18;
+  const bw=(w-pl-10)/data.length;
+  let bars="",labs="",grid="";
+  for(let i=0;i<=3;i++){
+    const y=pt+(h-pt-pb)*(i/3);
+    grid+=`<line x1="${pl}" y1="${y}" x2="${w-6}" y2="${y}" stroke="${C.line}" stroke-width="1"/>`;
+    grid+=`<text x="${pl-8}" y="${y+4}" text-anchor="end" font-size="10" fill="${C.dim}" font-family="IBM Plex Mono">${Math.round(max*(1-i/3)/100)*100}</text>`;
+  }
+  data.forEach((d,i)=>{
+    const bh=(h-pt-pb)*(d.v/max), x=pl+i*bw+bw*0.22, y=h-pb-bh, ww=bw*0.56;
+    const hi=d.hi;
+    bars+=`<rect x="${x}" y="${y}" width="${ww}" height="${bh}" rx="6" fill="${hi?C.teal:"#BFE7DC"}">
+      <animate attributeName="height" from="0" to="${bh}" dur=".5s" fill="freeze"/>
+      <animate attributeName="y" from="${h-pb}" to="${y}" dur=".5s" fill="freeze"/></rect>`;
+    if(hi) bars+=`<g><rect x="${x-16}" y="${y-30}" width="${ww+32}" height="22" rx="7" fill="${C.ink}"/>
+      <text x="${x+ww/2}" y="${y-15}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" font-family="IBM Plex Mono">R$ ${d.v}</text></g>`;
+    labs+=`<text x="${x+ww/2}" y="${h-8}" text-anchor="middle" font-size="11" fill="${C.dim}" font-weight="600" font-family="Inter">${d.l}</text>`;
+  });
+  el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto">${grid}${bars}${labs}</svg>`;
+}
+
+function areaChart(el,s1,s2){
+  const w=520,h=190,pl=38,pb=24,pt=14;
+  const max=Math.max(...s1)*1.2;
+  const step=(w-pl-8)/(s1.length-1);
+  const px=i=>pl+i*step, py=v=>h-pb-(h-pt-pb)*(v/max);
+  const path=a=>a.map((v,i)=>(i?"L":"M")+px(i).toFixed(1)+" "+py(v).toFixed(1)).join(" ");
+  let grid="";
+  for(let i=0;i<=3;i++){const y=pt+(h-pt-pb)*(i/3);
+    grid+=`<line x1="${pl}" y1="${y}" x2="${w-6}" y2="${y}" stroke="${C.line}"/>`;
+    grid+=`<text x="${pl-7}" y="${y+4}" text-anchor="end" font-size="9.5" fill="${C.dim}" font-family="IBM Plex Mono">${(max*(1-i/3)/1000).toFixed(0)}k</text>`;}
+  const area=path(s1)+` L ${px(s1.length-1)} ${h-pb} L ${pl} ${h-pb} Z`;
+  const hi=Math.round(s1.length*0.62);
+  el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto">
+    <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${C.teal}" stop-opacity=".28"/><stop offset="100%" stop-color="${C.teal}" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${grid}
+    <path d="${area}" fill="url(#ga)"/>
+    <path d="${path(s1)}" fill="none" stroke="${C.teal}" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="${path(s2)}" fill="none" stroke="${C.ice}" stroke-width="2" stroke-dasharray="5 4"/>
+    <line x1="${px(hi)}" y1="${pt}" x2="${px(hi)}" y2="${h-pb}" stroke="${C.dim}" stroke-dasharray="3 3"/>
+    <circle cx="${px(hi)}" cy="${py(s1[hi])}" r="5" fill="#fff" stroke="${C.teal}" stroke-width="3"/>
+    <g><rect x="${px(hi)-52}" y="${py(s1[hi])-40}" width="104" height="30" rx="8" fill="${C.ink}"/>
+    <text x="${px(hi)}" y="${py(s1[hi])-27}" text-anchor="middle" font-size="9.5" fill="#9FB8B3" font-family="Inter">quinta, dia 12</text>
+    <text x="${px(hi)}" y="${py(s1[hi])-15}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fff" font-family="IBM Plex Mono">R$ ${s1[hi].toLocaleString("pt-BR")}</text></g>
+  </svg>
+  <div class="legend" style="margin-top:12px">
+    <span><i style="background:${C.teal}"></i>Faturamento</span>
+    <span><i style="background:${C.ice}"></i>Margem bruta</span>
+  </div>`;
+}
+
+function donut(el,data){
+  const cx=100,cy=100,r=74,sw=26;
+  const tot=data.reduce((s,d)=>s+d.v,0);
+  let a=-Math.PI/2,segs="";
+  data.forEach(d=>{
+    const ang=(d.v/tot)*Math.PI*2,e=a+ang;
+    const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a),x2=cx+r*Math.cos(e),y2=cy+r*Math.sin(e);
+    segs+=`<path d="M ${x1} ${y1} A ${r} ${r} 0 ${ang>Math.PI?1:0} 1 ${x2} ${y2}" fill="none"
+      stroke="${d.c}" stroke-width="${sw}" stroke-linecap="butt"/>`;
+    const mid=a+ang/2,lr=r;
+    segs+=`<text x="${cx+lr*Math.cos(mid)}" y="${cy+lr*Math.sin(mid)+4}" text-anchor="middle"
+      font-size="11" font-weight="700" fill="#fff" font-family="IBM Plex Mono">${Math.round(d.v/tot*100)}%</text>`;
+    a=e;
+  });
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center">
+    <svg viewBox="0 0 200 200" style="width:190px;height:190px;flex:none">${segs}
+      <text x="100" y="94" text-anchor="middle" font-size="12" fill="${C.dim}" font-family="Inter" font-weight="600">eletrônico</text>
+      <text x="100" y="118" text-anchor="middle" font-size="26" font-weight="800" fill="${C.ink}" font-family="Outfit">82%</text>
+    </svg>
+    <div style="flex:1;min-width:150px">
+      ${data.map(d=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid ${C.line};font-size:12.5px">
+        <i style="width:10px;height:10px;border-radius:3px;background:${d.c};flex:none"></i>
+        <span style="flex:1;font-weight:600">${d.l}</span>
+        <b class="mono">R$ ${brl(d.r)}</b></div>`).join("")}
+      <div style="font-size:11px;color:${C.dim};margin-top:10px;line-height:1.5">
+        82% das vendas passam por maquininha ou Pix — e cada uma precisa estar amarrada a uma nota.</div>
+    </div></div>`;
+}
+
+function hbars(el,data){
+  const max=Math.max(...data.map(d=>d.v));
+  el.innerHTML=data.map(d=>`
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:11px">
+      <span class="mono" style="width:44px;font-size:11.5px;color:${C.dim}">${d.l}</span>
+      <div style="flex:1;height:22px;background:${C.line};border-radius:8px;overflow:hidden">
+        <div style="height:100%;width:${(d.v/max*100).toFixed(1)}%;background:${d.c};border-radius:8px"></div>
+      </div>
+      <b class="mono" style="width:44px;text-align:right;font-size:11.5px">${d.v}</b>
+    </div>`).join("")
+    +`<div style="font-size:11.5px;color:${C.dim};margin-top:4px;line-height:1.55">
+       Dois picos: saída do almoço e fim da tarde. Vale reforçar o caixa nesses horários.</div>`;
+}
+
+function groupBars(el,data){
+  const w=520,h=200,pl=42,pb=28,pt=12;
+  const max=Math.max(...data.flatMap(d=>[d.a,d.b]))*1.15;
+  const gw=(w-pl-10)/data.length;
+  let g="",bars="";
+  for(let i=0;i<=3;i++){const y=pt+(h-pt-pb)*(i/3);
+    g+=`<line x1="${pl}" y1="${y}" x2="${w-6}" y2="${y}" stroke="${C.line}"/>
+        <text x="${pl-7}" y="${y+4}" text-anchor="end" font-size="9.5" fill="${C.dim}" font-family="IBM Plex Mono">${(max*(1-i/3)/1000).toFixed(1)}k</text>`;}
+  data.forEach((d,i)=>{
+    const bx=pl+i*gw+gw*0.2,bw2=gw*0.26;
+    [[d.a,C.teal,0],[d.b,C.pump,bw2+3]].forEach(([v,col,off])=>{
+      const bh=(h-pt-pb)*(v/max);
+      bars+=`<rect x="${bx+off}" y="${h-pb-bh}" width="${bw2}" height="${bh}" rx="5" fill="${col}"/>`;
+    });
+    bars+=`<text x="${bx+bw2+2}" y="${h-9}" text-anchor="middle" font-size="10.5" fill="${C.dim}" font-weight="600" font-family="Inter">${d.l}</text>`;
+  });
+  el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto">${g}${bars}</svg>
+    <div class="legend" style="margin-top:10px">
+      <span><i style="background:${C.teal}"></i>Vendas em cartão e Pix</span>
+      <span><i style="background:${C.pump}"></i>Taxa retida</span>
+    </div>`;
+}
+
+function matchBars(el){
+  const rows=[
+    {l:"Débito",bruto:34210,notas:34210,c:C.teal},
+    {l:"Crédito",bruto:21140,notas:21140,c:C.ice},
+    {l:"Pix",bruto:27180,notas:27180,c:C.gold}
+  ];
+  const max=Math.max(...rows.map(r=>r.bruto));
+  el.innerHTML=rows.map(r=>`
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+        <b>${r.l}</b><span class="mono" style="color:${C.dim}">R$ ${brl(r.bruto)} · ${r.notas===r.bruto?"100% em nota":"divergente"}</span>
+      </div>
+      <div style="height:16px;background:${C.line};border-radius:7px;overflow:hidden;position:relative">
+        <div style="height:100%;width:${(r.bruto/max*100).toFixed(1)}%;background:${r.c};border-radius:7px"></div>
+      </div>
+    </div>`).join("")
+    +`<div style="font-size:11.5px;color:${C.dim};line-height:1.55">
+      A Sefaz recebe da adquirente tudo que passou no CNPJ e compara com as notas emitidas. Este painel mostra o mesmo cruzamento antes dela.</div>`;
+}
+
+function taxBars(el){
+  const d=[{l:"Tributado normal",v:38,c:C.teal},{l:"Substituição tributária",v:47,c:C.ice},{l:"Monofásico",v:11,c:C.gold},{l:"Isento",v:4,c:"#C9D6D3"}];
+  el.innerHTML=`<div style="display:flex;height:26px;border-radius:9px;overflow:hidden;margin-bottom:14px">
+      ${d.map(x=>`<div style="width:${x.v}%;background:${x.c}"></div>`).join("")}</div>
+    ${d.map(x=>`<div style="display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12.5px">
+      <i style="width:10px;height:10px;border-radius:3px;background:${x.c};flex:none"></i>
+      <span style="flex:1;font-weight:600">${x.l}</span><b class="mono">${x.v}%</b></div>`).join("")}
+    <div style="font-size:11.5px;color:${C.dim};margin-top:10px;line-height:1.55">
+      58% do faturamento não deve ser tributado de novo no Simples. Isso vai separado no pacote do contador.</div>`;
+}
+
+/* ============ DADOS ============ */
+let produtos=[
+  {cod:"1001",nm:"Leite Integral Itambé 1L",un:"UN",custo:3.98,pv:5.49,est:48},
+  {cod:"1002",nm:"Refrigerante Coca-Cola 2L",un:"UN",custo:7.10,pv:9.99,est:36},
+  {cod:"1003",nm:"Arroz Branco Tio João 5kg",un:"FD",custo:24.10,pv:27.90,est:22},
+  {cod:"1004",nm:"Açúcar Refinado União 1kg",un:"UN",custo:3.55,pv:4.79,est:60},
+  {cod:"1005",nm:"Feijão Carioca Kicaldo 1kg",un:"UN",custo:6.40,pv:8.49,est:41},
+  {cod:"1006",nm:"Café Santa Clara 250g",un:"UN",custo:9.20,pv:12.90,est:29},
+  {cod:"2001",nm:"Alcatra bovina",un:"KG",custo:34.90,pv:42.90,est:18.4},
+  {cod:"2002",nm:"Tomate italiano",un:"KG",custo:5.90,pv:8.90,est:24.9}
+];
+let fornecedores=[
+  {nm:"Laticínios Betânia S/A",cnpj:"07.271.588/0001-45",uf:"CE",cond:"21 / 35 dias",notas:14,origem:"XML"},
+  {nm:"Atacado Iparana Ltda",cnpj:"12.884.001/0001-72",uf:"CE",cond:"à vista",notas:9,origem:"XML"},
+  {nm:"Bebidas Fortaleza Distrib.",cnpj:"03.117.442/0001-08",uf:"CE",cond:"28 dias",notas:6,origem:"XML"}
+];
+let titulos=[
+  {forn:"Laticínios Betânia S/A",doc:"7219/1",venc:"2026-08-16",val:602.25,st:"aberto",org:"NF"},
+  {forn:"Atacado Iparana Ltda",doc:"2907/1",venc:"2026-08-19",val:2860.00,st:"aberto",org:"NF"},
+  {forn:"Enel Distribuição Ceará",doc:"Energia 08/26",venc:"2026-08-21",val:1284.40,st:"aberto",org:"Manual"},
+  {forn:"Bebidas Fortaleza Distrib.",doc:"5541/2",venc:"2026-08-22",val:4193.35,st:"aberto",org:"NF"},
+  {forn:"Laticínios Betânia S/A",doc:"7188/2",venc:"2026-08-04",val:512.80,st:"pago",org:"NF"}
+];
+const HOJE="2026-08-16";
+const T={painel:["Painel","Mercantil Santo Expedito · Caucaia/CE · domingo, 16 de agosto"],
+  entrada:["Entrada de nota fiscal","Importe o XML e o resto acontece sozinho"],
+  produtos:["Produtos","Preço novo chega ao caixa em segundos"],
+  fornec:["Fornecedores","Cadastrados pela própria nota de compra"],
+  pagar:["Contas a pagar","Títulos da nota de entrada e lançamentos manuais"],
+  rel:["Relatórios","O que vende, o que dá margem e o que a maquininha leva"],
+  contador:["Contador","Tudo que o escritório precisa, no dia 1º, sem cobrar de ninguém"],
+  config:["Configurações","Equipamentos, maquininhas e nota fiscal"],
+  users:["Usuários","Quem entra, o que pode fazer e o que já fez"]};
+
+/* ============ NAVEGAÇÃO ============ */
+document.querySelectorAll(".side nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".side nav button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
+  $("v-"+b.dataset.v).classList.add("on");
+  $("pgTitle").textContent=T[b.dataset.v][0];
+  $("pgCrumb").textContent=T[b.dataset.v][1];
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+
+/* ============ PRODUTOS ============ */
+let pFilter="";
+function drawProd(){
+  const marg=p=>((p.pv-p.custo)/p.pv*100);
+  const list=produtos.filter(p=>!pFilter||p.nm.toLowerCase().includes(pFilter)||p.cod.includes(pFilter));
+  $("prodTbl").innerHTML=`<thead><tr><th>Produto</th><th class="c">Un</th><th class="r">Custo</th><th class="r">Venda</th>
+    <th class="r">Margem</th><th class="r">Estoque</th><th class="r"></th></tr></thead><tbody>`+
+    list.map(p=>{const m=marg(p),i=produtos.indexOf(p);
+      return `<tr><td><div class="who"><div class="ava" style="background:${AV[i%AV.length]}">${ini(p.nm)}</div>
+        <div class="t"><b>${p.nm}</b><span>${p.cod}</span></div></div></td>
+      <td class="c"><span class="pill p-mute">${p.un}</span></td>
+      <td class="r mono">${brl(p.custo)}</td><td class="r mono"><b>${brl(p.pv)}</b></td>
+      <td class="r"><span class="pill ${m<0?'p-bad':m<15?'p-warn':'p-ok'}">${m.toFixed(1)}%</span></td>
+      <td class="r mono">${p.un==="KG"?p.est.toFixed(3):p.est}</td>
+      <td class="r"><button class="btn sm" data-p="${i}">Preço</button></td></tr>`}).join("")+`</tbody>`;
+  $("prodCount").textContent=list.length+" produtos";
+}
+$("pq").addEventListener("input",e=>{pFilter=e.target.value.trim().toLowerCase();drawProd()});
+$("prodTbl").addEventListener("click",e=>{
+  const b=e.target.closest("[data-p]"); if(!b)return;
+  const p=produtos[+b.dataset.p];
+  $("precoBody").innerHTML=`
+    <div style="font-family:Outfit;font-size:16px;font-weight:800">${p.nm}</div>
+    <div style="font-size:12px;color:var(--dim);margin-bottom:18px">Custo hoje R$ ${brl(p.custo)}</div>
+    <div class="g2">
+      <div class="fld"><label>Preço de hoje</label><input value="${brl(p.pv)}" disabled></div>
+      <div class="fld"><label>Preço novo</label><input id="npv" value="${brl(p.pv)}"></div>
+      <div class="fld"><label>Começa a valer em</label><input type="date" id="vini" value="${HOJE}"></div>
+      <div class="fld"><label>Vale até (opcional)</label><input type="date" id="vfim"></div>
+    </div>
+    <div class="alert a-ok" style="margin-bottom:0"><span class="ai">✓</span><div>Com data futura, o caixa baixa a mudança antes e liga sozinho na hora certa. Funciona mesmo se a internet cair naquele momento.</div></div>`;
+  $("precoOk").onclick=()=>{
+    const nv=parseN($("npv").value); if(nv<=0)return toast("Informe um preço válido.",true);
+    const d=$("vini").value; p.pv=nv; drawProd(); closeM($("veilPreco"));
+    toast(d>HOJE?`Preço agendado para ${d.split("-").reverse().join("/")} e já enviado ao caixa.`
+                :"Preço atualizado. Chegou ao caixa e vale a partir da próxima venda.");
+  };
+  openM($("veilPreco"));
+});
+$("precoCancel").onclick=()=>closeM($("veilPreco"));
+
+/* ============ FORNECEDORES ============ */
+function drawForn(){
+  $("fornTbl").innerHTML=`<thead><tr><th>Fornecedor</th><th class="c">UF</th><th>Condição</th>
+    <th class="r">Notas</th><th class="c">Cadastro</th></tr></thead><tbody>`+
+    fornecedores.map((f,i)=>`<tr>
+      <td><div class="who"><div class="ava" style="background:${AV[i%AV.length]}">${ini(f.nm)}</div>
+        <div class="t"><b>${f.nm}</b><span>${f.cnpj}</span></div></div></td>
+      <td class="c"><span class="pill p-mute">${f.uf}</span></td><td>${f.cond}</td>
+      <td class="r mono"><b>${f.notas}</b></td>
+      <td class="c"><span class="pill ${f.origem==="XML"?"p-ok":"p-mute"}">${f.origem==="XML"?"veio da nota":"manual"}</span></td></tr>`).join("")+`</tbody>`;
+  $("fornCount").textContent=fornecedores.length+" fornecedores";
+}
+
+/* ============ CONTAS A PAGAR ============ */
+const dOf=s=>new Date(s+"T00:00:00");
+function drawPagar(){
+  const hoje=dOf(HOJE),lim=new Date(hoje);lim.setDate(lim.getDate()+7);
+  const ab=titulos.filter(t=>t.st==="aberto"),sum=a=>a.reduce((s,t)=>s+t.val,0);
+  const vHoje=ab.filter(t=>t.venc===HOJE),v7=ab.filter(t=>{const d=dOf(t.venc);return d>hoje&&d<=lim});
+  const pg=titulos.filter(t=>t.st==="pago");
+  $("kHoje").textContent="R$ "+brl(sum(vHoje));$("kHojeN").textContent=vHoje.length+" título(s)";
+  $("k7").textContent="R$ "+brl(sum(v7));$("k7n").textContent=v7.length+" título(s)";
+  $("kAb").textContent="R$ "+brl(sum(ab));$("kAbN").textContent=ab.length+" em aberto";
+  $("kPg").textContent="R$ "+brl(sum(pg));
+  $("navPagar").textContent=ab.length;
+
+  const ord=[...titulos].sort((a,b)=>a.venc.localeCompare(b.venc));
+  $("pagarTbl").innerHTML=`<thead><tr><th>Fornecedor</th><th>Documento</th><th class="c">Origem</th>
+    <th>Vencimento</th><th class="r">Valor</th><th class="c">Situação</th><th class="r"></th></tr></thead><tbody>`+
+    ord.map(t=>{
+      const ix=titulos.indexOf(t),d=dOf(t.venc),atr=t.st==="aberto"&&d<hoje,hj=t.venc===HOJE;
+      const ai=fornecedores.findIndex(f=>f.nm===t.forn);
+      return `<tr>
+        <td><div class="who"><div class="ava" style="background:${AV[(ai<0?4:ai)%AV.length]}">${ini(t.forn)}</div>
+          <div class="t"><b>${t.forn}</b><span>${t.org==="NF"?"nota fiscal":"manual"}</span></div></div></td>
+        <td class="mono">${t.doc}</td>
+        <td class="c"><span class="pill ${t.org==="NF"?"p-info":"p-mute"}">${t.org==="NF"?"nota de entrada":"manual"}</span></td>
+        <td class="mono" style="${atr?'color:var(--bad);font-weight:700':hj?'color:var(--warn);font-weight:700':''}">${t.venc.split("-").reverse().join("/")}${hj?" · hoje":""}</td>
+        <td class="r mono"><b>${brl(t.val)}</b></td>
+        <td class="c"><span class="pill ${t.st==="pago"?"p-ok":atr?"p-bad":"p-warn"}">${t.st==="pago"?"pago":atr?"vencido":"aberto"}</span></td>
+        <td class="r">${t.st==="aberto"?`<button class="btn sm" data-t="${ix}">Dar baixa</button>`:"—"}</td></tr>`;
+    }).join("")+`</tbody>`;
+}
+$("pagarTbl").addEventListener("click",e=>{
+  const b=e.target.closest("[data-t]"); if(!b)return;
+  const t=titulos[+b.dataset.t];
+  $("titTitle").textContent="Dar baixa no título";
+  $("titBody").innerHTML=`
+    <div style="font-family:Outfit;font-size:16px;font-weight:800">${t.forn}</div>
+    <div style="font-size:12px;color:var(--dim);margin-bottom:18px">Documento ${t.doc} · vence ${t.venc.split("-").reverse().join("/")}</div>
+    <div class="g2">
+      <div class="fld"><label>Valor</label><input value="${brl(t.val)}" disabled></div>
+      <div class="fld"><label>Pago em</label><input type="date" value="${HOJE}"></div>
+      <div class="fld"><label>Saiu de</label><select><option>Caixa da loja</option><option>Banco do Brasil · 12.443-7</option><option>Mercado Pago</option></select></div>
+      <div class="fld"><label>Como pagou</label><select><option>Pix</option><option>Boleto</option><option>Dinheiro</option><option>Transferência</option></select></div>
+    </div>
+    <div class="alert a-ok" style="margin-bottom:0"><span class="ai">✓</span><div>A baixa quita o título e registra a saída no caixa. Nada precisa ser digitado duas vezes.</div></div>`;
+  $("titOk").textContent="Confirmar baixa";
+  $("titOk").onclick=()=>{t.st="pago";drawPagar();closeM($("veilTit"));toast("Título pago e saída registrada no caixa.")};
+  openM($("veilTit"));
+});
+$("novoTit").onclick=()=>{
+  $("titTitle").textContent="Novo título";
+  $("titBody").innerHTML=`
+    <div class="fld"><label>Para quem</label>
+      <select id="tf">${fornecedores.map(f=>`<option>${f.nm}</option>`).join("")}<option>Enel Distribuição Ceará</option></select></div>
+    <div class="g2">
+      <div class="fld"><label>Documento</label><input id="td" placeholder="ex.: Aluguel 09/26"></div>
+      <div class="fld"><label>Valor</label><input id="tv" placeholder="0,00"></div>
+      <div class="fld"><label>Vence em</label><input type="date" id="tvc" value="${HOJE}"></div>
+      <div class="fld"><label>Categoria</label><select><option>Mercadoria para revenda</option><option>Energia</option><option>Aluguel</option><option>Folha</option><option>Taxa de cartão</option><option>Outras despesas</option></select></div>
+    </div>
+    <div class="fld" style="margin-bottom:0"><label>Repetir</label>
+      <select><option>Não repetir</option><option>Todo mês, por 12 meses</option><option>Todo mês, sem data para acabar</option></select>
+      <div class="hint">Aluguel e energia entram sozinhos todo mês.</div></div>`;
+  $("titOk").textContent="Salvar título";
+  $("titOk").onclick=()=>{
+    const v=parseN($("tv").value),doc=$("td").value.trim();
+    if(!doc||v<=0)return toast("Preencha o documento e o valor.",true);
+    titulos.push({forn:$("tf").value,doc,venc:$("tvc").value,val:v,st:"aberto",org:"Manual"});
+    drawPagar();closeM($("veilTit"));toast("Título lançado no contas a pagar.");
+  };
+  openM($("veilTit"));
+};
+$("titCancel").onclick=()=>closeM($("veilTit"));
+
+/* ============ MAQUININHAS ============ */
+const ACQ=[
+  {id:"mp",nm:"Mercado Pago",sub:"Point Smart · usa a internet da nuvem",cor:"#00B1EA",tag:["em uso","p-ok"],fields:[
+    ["Token de acesso","APP_USR-4417••••••••••••••••8820"],["Identificação da conta","1889224710"],
+    ["Terminal","PAX_A910__SMARTPOS1495234801"],["Caixa","SANTOEXPEDITO-CX01"]],
+   note:"A cobrança vai direto para a maquininha e a resposta volta sozinha. Cada pedido leva uma chave única, então a mesma venda nunca é cobrada duas vezes."},
+  {id:"stone",nm:"Stone",sub:"Stone Connect",cor:"#00A868",tag:["pronto","p-warn"],fields:[["Stone Code",""],["Chave de integração",""],["Série do terminal",""]],
+   note:"Já testado. Se a loja trocar de maquininha, é só colar as chaves aqui."},
+  {id:"pagbank",nm:"PagBank",sub:"Moderninha",cor:"#00A868",fields:[["Token da conta",""],["E-mail da conta",""],["Série do terminal",""]]},
+  {id:"cielo",nm:"Cielo",sub:"LIO",cor:"#0099D8",fields:[["Merchant ID",""],["Merchant Key",""],["Número lógico",""]]},
+  {id:"getnet",nm:"Getnet",sub:"Santander",cor:"#EC6C1E",fields:[["Seller ID",""],["Client ID",""],["Client Secret",""]]},
+  {id:"rede",nm:"Rede",sub:"Itaú",cor:"#EE3124",fields:[["Filiação (PV)",""],["Token",""]]},
+  {id:"tef",nm:"TEF de várias bandeiras",sub:"PayGo · SiTef · Cappta",cor:"#B58A00",tag:["opcional","p-mute"],fields:[["Provedor",""],["CNPJ da loja",""],["Ponto de captura",""]],
+   note:"Uma integração só que atende todas as maquininhas. Tem mensalidade — só compensa se a loja usar várias ao mesmo tempo."}
+];
+$("acqList").innerHTML=ACQ.map(a=>`
+  <div class="acq" id="acq-${a.id}">
+    <div class="top2" data-acq="${a.id}">
+      <div class="lg" style="background:${a.cor}">${a.nm.slice(0,2).toUpperCase()}</div>
+      <div class="nm"><b>${a.nm}</b><span>${a.sub}</span></div>
+      <span class="pill ${a.tag?a.tag[1]:"p-mute"}">${a.tag?a.tag[0]:"não configurada"}</span>
+    </div>
+    <div class="bd">
+      <div class="g2">${a.fields.map(f=>`<div class="fld"><label>${f[0]}</label><input class="tok" value="${f[1]||""}" placeholder="colar aqui"></div>`).join("")}</div>
+      ${a.note?`<div class="alert a-ok"><span class="ai">✓</span><div>${a.note}</div></div>`:""}
+      <div style="display:flex;gap:10px"><button class="btn sm" data-test="${a.nm}">Testar conexão</button><button class="btn sm pri">Salvar</button></div>
+    </div>
+  </div>`).join("");
+$("acqList").addEventListener("click",e=>{
+  const t=e.target.closest("[data-acq]");
+  if(t){$("acq-"+t.dataset.acq).classList.toggle("open");return}
+  const b=e.target.closest("[data-test]");
+  if(b){b.textContent="Testando…";b.disabled=true;
+    setTimeout(()=>{b.textContent="Testar conexão";b.disabled=false;toast(b.dataset.test+": a maquininha respondeu em 340 ms.")},1300)}
+});
+$("acq-mp").classList.add("open");
+
+/* ============ ENTRADA DE NF ============ */
+const XML_ITENS=[
+  {desc:"LEITE UHT INTEG ITAMBE 1L CX12",prod:"1001",qt:120,custo:4.42},
+  {desc:"REFRIG COLA 2L PET",prod:"1002",qt:48,custo:7.10},
+  {desc:"ARROZ BCO T1 TIO JOAO FD5KG",prod:"1003",qt:30,custo:24.10},
+  {desc:"ACUCAR REF UNIAO PCT 1KG",prod:"1004",qt:60,custo:3.55},
+  {desc:"BISC REC CHOC PASSATEMPO 130G",prod:"",qt:36,custo:2.68},
+  {desc:"AMACIANTE CONF ORIGINAL 500ML",prod:"",qt:18,custo:6.90}
+];
+let wStep=1;
+function startEntrada(tipo){
+  $("entradaStart").style.display="none";$("entradaProc").style.display="block";
+  const passos=tipo==="xml"
+    ?[["Lendo o XML…","Conferindo assinatura e chave de acesso"],
+      ["Vendo quem emitiu…","CNPJ 07.412.885/0001-30, fornecedor novo"],
+      ["Conferindo 6 itens…","Comparando com entradas anteriores"],
+      ["Lendo as parcelas…","3 duplicatas para o contas a pagar"]]
+    :[["Preparando o PDF…","Separando as páginas"],
+      ["Reconhecendo o texto…","Cabeçalho, itens e parcelas"],
+      ["Entendendo os campos…","Confiança de 94%, vai pedir conferência"],
+      ["Montando a entrada…","Comparando com o cadastro da loja"]];
+  let i=0;
+  const tick=()=>{
+    $("procTxt").textContent=passos[i][0];$("procSub").textContent=passos[i][1];
+    $("procBar").style.width=(((i+1)/passos.length)*100)+"%";i++;
+    if(i<passos.length)setTimeout(tick,750);
+    else setTimeout(()=>{
+      $("entradaProc").style.display="none";$("entradaWiz").style.display="block";
+      wStep=1;drawWiz();drawDepara();
+      if(tipo==="pdf")toast("DANFE lido. Confira os itens antes de confirmar.",true);
+    },820);
+  };tick();
+}
+$("dropXml").onclick=()=>startEntrada("xml");
+$("dropPdf").onclick=()=>startEntrada("pdf");
+
+function drawDepara(){
+  $("deparaList").innerHTML=XML_ITENS.map((it,i)=>`
+    <div class="depara">
+      <div class="from"><b>${it.desc}</b><br><span>${it.qt} un × R$ ${brl(it.custo)}</span></div>
+      <div class="arrow">→</div>
+      <div><select data-d="${i}">
+          <option value="">— cadastrar como produto novo —</option>
+          ${produtos.map(p=>`<option value="${p.cod}" ${p.cod===it.prod?"selected":""}>${p.cod} · ${p.nm}</option>`).join("")}
+        </select>
+        ${it.prod?'<div style="font-size:10.5px;color:var(--teal-ink);margin-top:5px;font-weight:700">já reconhecido</div>'
+                 :'<div style="font-size:10.5px;color:var(--warn);margin-top:5px;font-weight:700">confira este</div>'}
+      </div>
+      <div class="r mono" style="font-weight:700">${brl(it.custo)}</div>
+    </div>`).join("");
+}
+function drawWiz(){
+  document.querySelectorAll(".step").forEach(s=>{const n=+s.dataset.s;
+    s.classList.toggle("on",n===wStep);s.classList.toggle("done",n<wStep)});
+  document.querySelectorAll(".wstep").forEach(s=>s.style.display=(+s.dataset.s===wStep)?"block":"none");
+  $("wizBack").style.display=wStep>1?"inline-flex":"none";
+  $("wizNext").textContent=wStep===4?"Confirmar entrada":"Continuar";
+}
+$("wizNext").onclick=()=>{
+  if(wStep<4){wStep++;drawWiz();return}
+  fornecedores.unshift({nm:"Distribuidora Norte Nordeste Ltda",cnpj:"07.412.885/0001-30",uf:"CE",cond:"28 / 42 / 56 dias",notas:1,origem:"XML"});
+  XML_ITENS.forEach(it=>{
+    const p=produtos.find(x=>x.cod===it.prod);
+    if(p){p.est+=it.qt;p.custo=it.custo}
+    else produtos.push({cod:String(1010+produtos.length),nm:it.desc.split(" ").slice(0,4).join(" "),un:"UN",custo:it.custo,pv:+(it.custo*1.38).toFixed(2),est:it.qt});
+  });
+  [["18442/1","2026-09-13",1439.63],["18442/2","2026-09-27",1439.63],["18442/3","2026-10-11",1439.64]]
+    .forEach(t=>titulos.push({forn:"Distribuidora Norte Nordeste Ltda",doc:t[0],venc:t[1],val:t[2],st:"aberto",org:"NF"}));
+  drawProd();drawForn();drawPagar();
+  $("entradaWiz").style.display="none";$("entradaStart").style.display="block";
+  toast("Entrada confirmada: fornecedor cadastrado, 312 unidades no estoque e 3 títulos criados.");
+  setTimeout(()=>toast("Catálogo atualizado enviado ao caixa."),2600);
+};
+$("wizBack").onclick=()=>{if(wStep>1){wStep--;drawWiz()}};
+$("wizCancel").onclick=()=>{$("entradaWiz").style.display="none";$("entradaStart").style.display="block"};
+
+/* ============ AÇÕES ============ */
+$("btnTestScale").onclick=function(){this.textContent="Lendo…";this.disabled=true;
+  setTimeout(()=>{this.textContent="Testar leitura";this.disabled=false;toast("A balança respondeu: 1,284 kg, peso estável.")},1200)};
+$("btnCargaPlu").onclick=()=>toast("Catálogo enviado: 214 códigos gravados na balança.");
+$("btnPacote").onclick=function(){this.textContent="Gerando…";this.disabled=true;
+  setTimeout(()=>{this.textContent="Gerar pacote de agosto";this.disabled=false;
+    toast("Pacote de agosto pronto: 8.412 XMLs de saída, 42 de entrada e os relatórios.")},1500)};
+$("btnEnviar").onclick=()=>toast("Pacote enviado para fiscal@nunescontabilidade.com.br");
+$("btnConvite").onclick=()=>openM($("veilConvite"));
+$("convCancel").onclick=()=>closeM($("veilConvite"));
+$("convOk").onclick=()=>{closeM($("veilConvite"));toast("Convite enviado. O contador cria a senha dele no primeiro acesso.")};
+
+/* ============ MONTAGEM ============ */
+barChart($("chartWeek"),[
+  {l:"Seg",v:3120},{l:"Ter",v:2980},{l:"Qua",v:3340},{l:"Qui",v:4260,hi:true},
+  {l:"Sex",v:4010},{l:"Sáb",v:4890},{l:"Dom",v:4128}]);
+areaChart($("chartTrend"),
+  [2900,3050,2870,3310,3420,3180,4120,3980,3640,3720,4180,4260,3910,4040,4380,4510,4220,4090,4330,4600,4180,4020,4260,4480,4710,4390,4180,4020,4310,4128],
+  [640,690,610,720,760,700,880,860,790,800,910,930,850,880,940,980,910,890,940,1000,900,870,920,970,1020,950,900,870,930,890]);
+donut($("chartPay"),[
+  {l:"Débito",v:34,r:34210,c:C.teal},
+  {l:"Pix",v:27,r:27180,c:C.gold},
+  {l:"Crédito",v:21,r:21140,c:C.ice},
+  {l:"Dinheiro",v:18,r:18120,c:"#C9D6D3"}]);
+hbars($("chartHour"),[
+  {l:"07h",v:9,c:"#C9E8DF"},{l:"09h",v:21,c:"#9CDCC9"},{l:"11h",v:38,c:C.teal},
+  {l:"13h",v:24,c:"#9CDCC9"},{l:"15h",v:19,c:"#C9E8DF"},{l:"17h",v:34,c:C.teal},
+  {l:"19h",v:41,c:C.teal},{l:"21h",v:14,c:"#C9E8DF"}]);
+groupBars($("chartFees"),[
+  {l:"Abr",a:71200,b:1890},{l:"Mai",a:74800,b:1980},{l:"Jun",a:79100,b:2140},
+  {l:"Jul",a:81400,b:2260},{l:"Ago",a:82530,b:2310}]);
+matchBars($("chartMatch"));
+taxBars($("chartTax"));
+
+drawProd();drawForn();drawPagar();
+})();
+</script>
