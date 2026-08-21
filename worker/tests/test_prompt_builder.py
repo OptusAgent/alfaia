@@ -1,5 +1,26 @@
 import pytest
+from datetime import datetime
 from app.services.prompt_builder import PromptBuilderService, REGRAS_INVIOLAVEIS_SISTEMA
+
+
+def test_prompt_contem_data_real_de_hoje():
+    """
+    Regressão do achado real em produção (2026-08-20): sem a data de hoje no prompt, a IA não
+    tinha como resolver "amanhã, dia 21/08" e gravou um agendamento com o ano 2023. O prompt
+    precisa sempre conter a data real do servidor no momento da geração.
+    """
+    contexto = {
+        "tipo_entrada": "primeiro_contato",
+        "contato": {"nome": "Valmir", "telefone": "5585988124477"},
+        "lead_atual": {"status": "novo"},
+    }
+
+    prompt = PromptBuilderService.gerar_prompt_sistema(contexto)
+
+    hoje = datetime.now().strftime("%d/%m/%Y")
+    assert hoje in prompt
+    assert "DATA E HORA ATUAL" in prompt
+    assert "nunca assuma outro ano" in prompt.lower()
 
 
 def test_prompt_retomada_contem_regra_sem_checklist():

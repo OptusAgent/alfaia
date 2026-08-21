@@ -278,6 +278,7 @@ class AIEngineService:
         ctx_exec = {
             "tenant_id": tenant_id,
             "lead": lead_dto,
+            "contato": contato_dto,
             "lead_service": lead_service,
             "conversa": {"estado": "ia"},
         }

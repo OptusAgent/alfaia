@@ -192,9 +192,12 @@ class ToolsRegistry:
         params = AgendarInput(**args)
         tenant_id = ctx.get("tenant_id", "tenant_piloto")
         lead = ctx.get("lead")
+        contato = ctx.get("contato")
         lead_id = lead.id if lead else "lead_piloto"
-        cliente_nome = lead.nome if hasattr(lead, "nome") and lead.nome else "Lead ALFAIA"
-        cliente_telefone = lead.telefone if hasattr(lead, "telefone") and lead.telefone else "5585988112233"
+        # Nome/telefone reais vivem em ContatoDTO, não em LeadDTO/LeadModel (que nunca tiveram
+        # esses campos) — usar `lead` aqui sempre caía no default e gravava "Lead ALFAIA" no ERP.
+        cliente_nome = contato.nome if contato and getattr(contato, "nome", None) else "Lead ALFAIA"
+        cliente_telefone = contato.telefone if contato and getattr(contato, "telefone", None) else "5585988112233"
 
         logger.info(f"Tool 'agendar' executada [params={params.model_dump()}]")
 

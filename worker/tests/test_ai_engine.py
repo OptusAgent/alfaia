@@ -369,3 +369,26 @@ def test_motor_envia_historico_real_para_llm_sem_duplicar_mensagem_atual():
     )
 
     assert res.texto_resposta == "Perfeito, seguimos com o casamento."
+
+
+def test_tool_agendar_usa_nome_e_telefone_reais_do_contato():
+    """
+    Regressão do achado real em produção (2026-08-20): `agendar` gravava sempre
+    cliente_nome="Lead ALFAIA" no ERP porque lia `ctx["lead"]` (que nunca teve campo `nome`/
+    `telefone`) em vez de `ctx["contato"]` (onde esses dados realmente vivem).
+    """
+    contato = ContatoDTO(
+        id="cnt_1", tenant_id="t1", nome="Valmir Moreira Junior",
+        telefone="558591733321", primeiro_contato_em="2026-08-10",
+    )
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    resultado = tools_registry.executar_tool(
+        "agendar",
+        {"tipo": "prova", "data": "2026-08-21", "hora": "08:00"},
+        {"tenant_id": "t1", "lead": lead, "contato": contato, "lead_service": None},
+    )
+
+    assert resultado["sucesso"] is True
+    assert resultado["agendamento"]["cliente_nome"] == "Valmir Moreira Junior"
+    assert resultado["agendamento"]["cliente_telefone"] == "558591733321"

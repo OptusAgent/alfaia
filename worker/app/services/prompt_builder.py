@@ -1,7 +1,13 @@
 import logging
+from datetime import datetime
 from typing import Any
 
 logger = logging.getLogger("alfaia.prompt_builder")
+
+_DIAS_SEMANA = [
+    "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+    "sexta-feira", "sábado", "domingo",
+]
 
 REGRAS_INVIOLAVEIS_SISTEMA = """
 === REGRAS INVIOLÁVEIS DE ATENDIMENTO (PRD §19.2) ===
@@ -80,9 +86,20 @@ Primeira vez que este cliente entra em contato. Acolha com cordialidade e descub
             linhas_historico.append(f"- {remetente}: {texto[:240]}")
         historico_bloco = "\n".join(linhas_historico) or "Sem histórico recente."
 
+        # Sem isto, a IA não tem como saber que ano/dia é hoje e precisa "adivinhar" quando o lead
+        # fala em datas relativas ("amanhã", "sexta que vem") — achado real em produção
+        # (2026-08-20): um agendamento para "amanhã, dia 21/08" foi gravado com o ano 2023.
+        agora = datetime.now()
+        data_hoje = f"{_DIAS_SEMANA[agora.weekday()]}, {agora.strftime('%d/%m/%Y')}"
+
         prompt_final = f"""{persona}
 
 {REGRAS_INVIOLAVEIS_SISTEMA}
+
+=== DATA E HORA ATUAL ===
+Hoje é {data_hoje}, {agora.strftime('%H:%M')}. Use esta data como referência real para resolver
+qualquer expressão relativa de tempo do lead ("amanhã", "essa semana", "dia 21/08" sem ano) —
+nunca assuma outro ano.
 
 {instrucao_entrada}
 
