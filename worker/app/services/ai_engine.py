@@ -59,6 +59,9 @@ class AIResponseDTO(BaseModel):
     transbordo_acionado: bool = False
     status_lead_resultante: str = "novo"
     midias_sugeridas: list[MidiaEnvioDTO] = []
+    # Preenchido só quando `atualizar_lead` corrige o nome do contato nesta troca (achado real em
+    # produção, 2026-08-21) — o chamador (webhooks.py) persiste no Postgres; None = sem mudança.
+    contato_nome_atualizado: str | None = None
 
 
 class AIEngineService:
@@ -367,6 +370,7 @@ class AIEngineService:
         midias_sugeridas: list[MidiaEnvioDTO] = []
         texto_inbound = " ".join(mensagens_inbound).strip()
 
+        nome_contato_original = contato_dto.nome
         ctx_exec = {
             "tenant_id": tenant_id,
             "lead": lead_dto,
@@ -476,6 +480,9 @@ class AIEngineService:
             # Nunca envia mídia quando a troca acionou transbordo — a oferta não se confirmou
             # de fato (P3, mesmo espírito da AC 5 da 4.8: falha não vira resposta "quase certa").
             midias_sugeridas=[] if transbordo_acionado else midias_sugeridas,
+            contato_nome_atualizado=(
+                contato_dto.nome if contato_dto.nome != nome_contato_original else None
+            ),
         )
 
 

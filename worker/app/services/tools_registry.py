@@ -40,6 +40,10 @@ class AtualizarLeadInput(BaseModel):
     tamanho: str | None = None
     cor: str | None = None
     valor_estimado: float | None = None
+    # Nome real do lead, informado/confirmado por ele na conversa — nunca o nome de exibição do
+    # WhatsApp (achado real em produção, 2026-08-21: agendamento sem forma confiável de contato
+    # além do telefone). Vive em ContatoDTO, não em LeadDTO — tratado à parte no tool handler.
+    nome_contato: str | None = None
 
 
 class MoverStatusInput(BaseModel):
@@ -73,16 +77,21 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "buscar_produtos": (
         "Busca peças disponíveis no catálogo real da WebLocação por evento, estilo, categoria, "
         "cor, tamanho e período. Chame antes de dizer que uma peça está disponível ou de citar "
-        "um valor — nunca inventar disponibilidade ou preço sem o resultado desta tool. Ao "
-        "apresentar um produto retornado, sempre mencione nome, código (campo `ref`), cor, "
-        "tamanhos disponíveis e valor reais do resultado — as fotos já são enviadas "
-        "separadamente pelo sistema, então não diga que está enviando imagem, apenas descreva o "
-        "produto e pergunte se o lead gostou. NUNCA escreva a URL da imagem nem sintaxe de link/"
-        "imagem (como ![]() ou [texto](url)) na resposta — o lead recebe a foto direto no "
-        "WhatsApp, escrever a URL no texto só aparece como link quebrado para ele. Se o lead já "
-        "mencionar um código específico (ex.: 'T-203') que você já mostrou antes, chame "
-        "buscar_produtos de novo passando esse código em `q` para confirmar os dados reais dele — "
-        "não repita a lista inteira de opções."
+        "um valor — nunca inventar disponibilidade ou preço sem o resultado desta tool. As fotos "
+        "com nome, código, cor, tamanhos e valor de cada produto já são enviadas separadamente "
+        "pelo sistema (uma legenda completa por foto) — a MENSAGEM DE TEXTO que você escreve "
+        "depois das fotos deve ser curta e nunca repetir nome/código/cor/tamanho/valor de novo, "
+        "nem em lista nem em frase corrida (ex.: certo: 'Encontrei 3 opções de ternos, veja as "
+        "fotos! Gostou de algum desses modelos?'; errado: repetir 'Valor de aluguel: R$ X' ou o "
+        "nome de cada peça no texto). Isso vale também quando o lead já confirmou interesse num "
+        "código específico e você reconsulta para checar disponibilidade numa data — responda "
+        "direto sobre a disponibilidade, sem redescrever cor/tamanho/valor que já foram mostrados "
+        "antes na mesma conversa. NUNCA diga que está 'enviando imagem' (quem envia é o sistema) "
+        "nem escreva a URL da imagem ou sintaxe de link/imagem (como ![]() ou [texto](url)) na "
+        "resposta — o lead recebe a foto direto no WhatsApp, a URL no texto só vira link quebrado. "
+        "Se o lead já mencionar um código específico (ex.: 'T-203') que você já mostrou antes, "
+        "chame buscar_produtos de novo passando esse código em `q` para confirmar os dados reais "
+        "dele — não repita a lista inteira de opções."
     ),
     "consultar_slots": (
         "Consulta horários livres reais para agendamento (prova, retirada, ajuste) num período. "
@@ -94,11 +103,21 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "agendar": (
         "Cria de fato um agendamento na WebLocação para o lead atual. Só chamar depois que o lead "
-        "confirmar um horário retornado por consultar_slots nesta mesma conversa."
+        "confirmar um horário retornado por consultar_slots nesta mesma conversa. Antes de "
+        "confirmar, se ainda não tiver um nome claro do lead nesta conversa, pergunte o nome dele "
+        "para deixar registrado no agendamento — nunca assuma que o nome de exibição do WhatsApp "
+        "(ex.: 'valmirmoreirajunior') é o nome real da pessoa; se o lead informar/confirmar o "
+        "nome, chame atualizar_lead com `nome_contato` preenchido antes de agendar. Sempre passe "
+        "`produto_ref` quando o agendamento for para experimentar/retirar uma peça específica já "
+        "identificada na conversa. Na mensagem final de confirmação, informe a data completa com "
+        "dia, mês e ANO (ex.: '22/08/2026', nunca só '22/08') — é a única garantia real que o "
+        "lead tem de que o ano está certo."
     ),
     "atualizar_lead": (
         "Atualiza os dados de interesse do lead atual (evento, peça, tamanho, cor, valor estimado) "
-        "coletados na conversa até agora."
+        "coletados na conversa até agora. Use `nome_contato` quando o lead informar ou confirmar o "
+        "próprio nome — é o único jeito de corrigir um nome de exibição de WhatsApp genérico antes "
+        "de um agendamento."
     ),
     "mover_status": (
         "Move o lead para outro status no Kanban conforme a evolução da conversa (ex.: qualificando, "
@@ -229,10 +248,21 @@ class ToolsRegistry:
 
     def atualizar_lead(self, args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         params = AtualizarLeadInput(**args)
+        dados = params.model_dump(exclude_none=True)
+        # nome_contato vive em ContatoDTO, não em LeadDTO/LeadModel (que nunca tiveram esse
+        # campo — mesmo motivo do bug real corrigido na story 5.3 para o `agendar`).
+        nome_contato = dados.pop("nome_contato", None)
+
         lead = ctx.get("lead")
         if lead:
-            for k, v in params.model_dump(exclude_none=True).items():
+            for k, v in dados.items():
                 setattr(lead, k, v)
+
+        if nome_contato:
+            contato = ctx.get("contato")
+            if contato:
+                contato.nome = nome_contato
+
         logger.info(f"Tool 'atualizar_lead' executada [params={params.model_dump(exclude_none=True)}]")
         return {"sucesso": True, "mensagem": "Dados do lead atualizados."}
 

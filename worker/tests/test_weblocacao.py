@@ -25,8 +25,13 @@ def test_wl_mock_adapter_parity():
 
     # 4. POST /agenda
     ag = mock.criar_agendamento({"tipo": "prova", "data": "2026-09-01", "hora": "14:00", "cliente_nome": "Mariana"})
-    assert ag.id == "wl_ag_999"
+    assert ag.id.startswith("wl_ag_")
     assert ag.status == "confirmado"
+
+    # Achado real em produção (2026-08-21): id fixo colidia com a constraint única do banco a
+    # partir do 2º agendamento — cada chamada precisa gerar um id realmente único.
+    ag2 = mock.criar_agendamento({"tipo": "prova", "data": "2026-09-02", "hora": "10:00", "cliente_nome": "Outro Cliente"})
+    assert ag.id != ag2.id
 
     # 5. GET /agenda (story 5.6)
     itens = mock.listar_agendamentos(data_inicio="2026-09-01", data_fim="2026-09-30")

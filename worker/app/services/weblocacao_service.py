@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 from datetime import datetime, timedelta
 import logging
 from typing import Any
@@ -233,8 +234,13 @@ class WLMockAdapter:
         return slots
 
     def criar_agendamento(self, dados: dict[str, Any]) -> WLAgendamentoDTO:
+        # Achado crítico real em produção (2026-08-21): id fixo "wl_ag_999" para TODO agendamento
+        # colidia com a constraint única (tenant_id, wl_agendamento_id) da tabela `agendamentos`
+        # assim que o primeiro agendamento de teste já existia — todo agendamento seguinte
+        # confirmava no "WL" mas nunca persistia de verdade no Postgres (409 Conflict silencioso),
+        # nunca aparecendo no Portal. Cada chamada agora gera um id único de verdade.
         return WLAgendamentoDTO(
-            id="wl_ag_999",
+            id=f"wl_ag_{uuid.uuid4().hex[:12]}",
             status="confirmado",
             tipo=dados.get("tipo", "prova"),
             data=dados.get("data", "2026-09-01"),

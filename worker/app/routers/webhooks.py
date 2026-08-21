@@ -246,6 +246,12 @@ async def _processar_payload_background(
         texto_resposta = res_ia.texto_resposta
         logger.info(f"Resposta IA gerada para {telefone}: '{texto_resposta}'")
 
+        # A IA confirmou/corrigiu o nome real do lead nesta troca (achado real em produção,
+        # 2026-08-21: agendamento sem nome confiável de contato além do telefone) — persiste no
+        # Postgres, mesmo caminho já usado para o push_name do WhatsApp.
+        if res_ia.contato_nome_atualizado and contato_id:
+            await supabase_rest_service.atualizar_contato_nome(contato_id, res_ia.contato_nome_atualizado)
+
         # 2.5. Envia as imagens reais dos produtos encontrados ANTES do texto (story 4.9, AC 1, 3)
         # — ordem natural de catálogo: mostrar a foto, depois perguntar/confirmar em texto. Falha
         # em uma mídia não bloqueia as demais nem o texto final (AC 5, é falha de canal, não de dado).

@@ -558,3 +558,60 @@ def test_motor_nao_sugere_midia_sem_buscar_produtos_na_troca():
     )
 
     assert res.midias_sugeridas == []
+
+
+def test_motor_atualiza_nome_do_contato_via_nome_contato():
+    """
+    Regressão do achado real em produção (2026-08-21): agendamento sem forma confiável de contato
+    além do telefone — a IA nunca tinha como corrigir o nome de exibição do WhatsApp (ex.:
+    "valmirmoreirajunior"). `atualizar_lead` com `nome_contato` agora corrige `contato.nome` de
+    verdade, e `processar_atendimento` reporta a mudança em `contato_nome_atualizado` para o
+    chamador persistir.
+    """
+    class FakeLLMComNome:
+        def gerar_resposta(self, **kwargs):
+            return LLMRespostaDTO(
+                content=None,
+                tool_calls=[LLMToolCallDTO(
+                    id="call_1", nome="atualizar_lead",
+                    argumentos={"nome_contato": "Valmir Moreira Junior"},
+                )],
+            )
+
+    engine = AIEngineService(llm_client=FakeLLMComNome())
+    contato = ContatoDTO(
+        id="cnt_1", tenant_id="t1", nome="valmirmoreirajunior",
+        telefone="558591733321", primeiro_contato_em="2026-08-10",
+    )
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="continuacao",
+        mensagens_inbound=["Meu nome completo é Valmir Moreira Junior"],
+    )
+
+    assert res.contato_nome_atualizado == "Valmir Moreira Junior"
+    assert contato.nome == "Valmir Moreira Junior"
+
+
+def test_motor_nao_reporta_nome_atualizado_quando_nao_muda():
+    class FakeLLMSemNome:
+        def gerar_resposta(self, **kwargs):
+            return LLMRespostaDTO(content="Perfeito, seguimos então.")
+
+    engine = AIEngineService(llm_client=FakeLLMSemNome())
+    contato = ContatoDTO(id="cnt_1", tenant_id="t1", nome="Mariana", telefone="5585988112233", primeiro_contato_em="2026-08-10")
+    lead = LeadModel(id="lead_1", tenant_id="t1", contato_id="cnt_1")
+
+    res = engine.processar_atendimento(
+        tenant_id="t1",
+        contato_dto=contato,
+        lead_dto=lead,
+        tipo_entrada="continuacao",
+        mensagens_inbound=["Perfeito"],
+    )
+
+    assert res.contato_nome_atualizado is None

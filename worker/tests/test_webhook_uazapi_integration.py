@@ -117,7 +117,7 @@ async def test_webhook_resolves_channel_fetches_ia_config_and_sends_with_real_in
             return type(
                 "AIResult",
                 (),
-                {"texto_resposta": "Resposta via OpenRouter mockada.", "midias_sugeridas": []},
+                {"texto_resposta": "Resposta via OpenRouter mockada.", "midias_sugeridas": [], "contato_nome_atualizado": None},
             )()
 
     monkeypatch.setattr(webhooks, "supabase_rest_service", FakeSupabase())
@@ -248,6 +248,7 @@ async def test_webhook_envia_midias_antes_do_texto_e_falha_parcial_nao_bloqueia(
                 {
                     "texto_resposta": "Gostou de algum desses modelos?",
                     "midias_sugeridas": [midia_ok, midia_falha],
+                    "contato_nome_atualizado": None,
                 },
             )()
 
