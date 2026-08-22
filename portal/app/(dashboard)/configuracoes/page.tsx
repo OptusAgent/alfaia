@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Radio,
   QrCode,
@@ -15,9 +15,11 @@ import {
   Clock3,
   Pencil,
   Trash2,
+  CalendarClock,
 } from "lucide-react";
 import { UazapiQrModal } from "./uazapi-qr-modal";
 import { Badge } from "@/app/components/ui/Badge";
+import { createClient } from "@/lib/supabase/client";
 
 interface Canal {
   id: string;
@@ -29,6 +31,23 @@ interface Canal {
   telefone: string | null;
   uazapi_instancia: string | null;
   ultimo_healthcheck_em: string | null;
+}
+
+interface Turno {
+  id: string;
+  dia_semana: number; // 0=domingo .. 6=sábado
+  hora_abertura: string; // "HH:MM:SS" (Postgres time)
+  hora_fechamento: string;
+}
+
+const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+function hhmm(hora: string) {
+  return hora.slice(0, 5);
+}
+
+function turnosSeSobrepoem(aInicio: string, aFim: string, bInicio: string, bFim: string) {
+  return aInicio < bFim && bInicio < aFim;
 }
 
 export default function ConfiguracoesPage() {
@@ -45,6 +64,167 @@ export default function ConfiguracoesPage() {
   const [resettingMemory, setResettingMemory] = useState(false);
   const [resetResult, setResetResult] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
+
+  const supabase = useMemo(() => createClient(), []);
+  const [tenantId, setTenantId] = useState("");
+  const [turnos, setTurnos] = useState<Turno[]>([]);
+  const [carregandoTurnos, setCarregandoTurnos] = useState(true);
+  const [erroTurnos, setErroTurnos] = useState<string | null>(null);
+  const [modalTurnoAberto, setModalTurnoAberto] = useState(false);
+  const [turnoEditando, setTurnoEditando] = useState<Turno | null>(null);
+  const [turnoExcluindo, setTurnoExcluindo] = useState<Turno | null>(null);
+  const [salvandoTurno, setSalvandoTurno] = useState(false);
+  const [erroFormTurno, setErroFormTurno] = useState<string | null>(null);
+  const [avisoSobreposicao, setAvisoSobreposicao] = useState<{
+    dia_semana: number;
+    hora_abertura: string;
+    hora_fechamento: string;
+  } | null>(null);
+
+  const turnosPorDia = useMemo(() => {
+    const mapa: Record<number, Turno[]> = {};
+    for (const t of turnos) {
+      (mapa[t.dia_semana] ||= []).push(t);
+    }
+    for (const dia of Object.keys(mapa)) {
+      mapa[Number(dia)].sort((a, b) => a.hora_abertura.localeCompare(b.hora_abertura));
+    }
+    return mapa;
+  }, [turnos]);
+
+  const fetchTurnos = useCallback(async (activeTenantId: string) => {
+    setCarregandoTurnos(true);
+    const { data, error } = await supabase
+      .from("horarios_funcionamento")
+      .select("id, dia_semana, hora_abertura, hora_fechamento")
+      .eq("tenant_id", activeTenantId)
+      .eq("ativo", true)
+      .order("dia_semana", { ascending: true })
+      .order("hora_abertura", { ascending: true });
+
+    if (error) {
+      setErroTurnos("Não foi possível carregar o horário de funcionamento agora.");
+      setTurnos([]);
+    } else {
+      setErroTurnos(null);
+      setTurnos((data as Turno[]) || []);
+    }
+    setCarregandoTurnos(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function iniciar() {
+      const res = await fetch("/api/tenant/active", { cache: "no-store" });
+      if (!res.ok || !mounted) {
+        setCarregandoTurnos(false);
+        return;
+      }
+      const data = await res.json();
+      const activeTenantId = String(data.tenant_id || "");
+      if (!mounted) return;
+      setTenantId(activeTenantId);
+      if (activeTenantId) await fetchTurnos(activeTenantId);
+      else setCarregandoTurnos(false);
+    }
+    void iniciar();
+    return () => {
+      mounted = false;
+    };
+  }, [fetchTurnos]);
+
+  function abrirModalCriarTurno() {
+    setTurnoEditando(null);
+    setErroFormTurno(null);
+    setModalTurnoAberto(true);
+  }
+
+  function abrirModalEditarTurno(turno: Turno) {
+    setTurnoEditando(turno);
+    setErroFormTurno(null);
+    setModalTurnoAberto(true);
+  }
+
+  async function salvarTurno(dados: { dia_semana: number; hora_abertura: string; hora_fechamento: string }) {
+    if (!tenantId) return;
+    setSalvandoTurno(true);
+    setErroFormTurno(null);
+    try {
+      const payload = {
+        tenant_id: tenantId,
+        dia_semana: dados.dia_semana,
+        hora_abertura: dados.hora_abertura,
+        hora_fechamento: dados.hora_fechamento,
+        editado_em: new Date().toISOString(),
+      };
+      const { error } = turnoEditando
+        ? await supabase
+            .from("horarios_funcionamento")
+            .update(payload)
+            .eq("id", turnoEditando.id)
+            .eq("tenant_id", tenantId)
+        : await supabase.from("horarios_funcionamento").insert(payload);
+
+      if (error) throw error;
+
+      setModalTurnoAberto(false);
+      setTurnoEditando(null);
+      setAvisoSobreposicao(null);
+      await fetchTurnos(tenantId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao salvar horário.";
+      setErroFormTurno(msg);
+    } finally {
+      setSalvandoTurno(false);
+    }
+  }
+
+  function handleSubmitTurno(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const diaSemana = Number(formData.get("dia_semana"));
+    const abertura = String(formData.get("hora_abertura") || "");
+    const fechamento = String(formData.get("hora_fechamento") || "");
+
+    if (!abertura || !fechamento) {
+      setErroFormTurno("Informe abertura e fechamento.");
+      return;
+    }
+    if (fechamento <= abertura) {
+      setErroFormTurno("O horário de fechamento precisa ser depois do de abertura.");
+      return;
+    }
+    setErroFormTurno(null);
+
+    const conflita = (turnosPorDia[diaSemana] || []).some(
+      (t) =>
+        t.id !== turnoEditando?.id &&
+        turnosSeSobrepoem(abertura, fechamento, hhmm(t.hora_abertura), hhmm(t.hora_fechamento))
+    );
+
+    if (conflita) {
+      setAvisoSobreposicao({ dia_semana: diaSemana, hora_abertura: abertura, hora_fechamento: fechamento });
+      return;
+    }
+
+    void salvarTurno({ dia_semana: diaSemana, hora_abertura: abertura, hora_fechamento: fechamento });
+  }
+
+  async function confirmarExcluirTurno() {
+    if (!turnoExcluindo || !tenantId) return;
+    setSalvandoTurno(true);
+    try {
+      await supabase
+        .from("horarios_funcionamento")
+        .delete()
+        .eq("id", turnoExcluindo.id)
+        .eq("tenant_id", tenantId);
+      setTurnoExcluindo(null);
+      await fetchTurnos(tenantId);
+    } finally {
+      setSalvandoTurno(false);
+    }
+  }
 
   async function fetchCanais() {
     try {
@@ -542,6 +722,233 @@ export default function ConfiguracoesPage() {
           </div>
         )}
       </div>
+
+      {/* Horário de Funcionamento */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2
+            className="font-display text-xl font-bold flex items-center gap-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Horário de Funcionamento
+            <Badge variant="neutral">{turnos.length} turnos cadastrados</Badge>
+          </h2>
+          <button onClick={abrirModalCriarTurno} className="glass-btn glass-btn-primary text-xs" disabled={!tenantId}>
+            <Plus className="h-4 w-4" />
+            <span>Novo Turno</span>
+          </button>
+        </div>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+          Usado pela IA para nunca oferecer horário de prova/retirada fora do expediente real da loja.
+          Alterações valem imediatamente, sem precisar de deploy.
+        </p>
+
+        {erroTurnos && (
+          <div
+            className="rounded-lg px-4 py-3 text-sm"
+            style={{
+              background: "var(--accent-coral-muted)",
+              color: "var(--accent-coral)",
+              border: "1px solid rgba(232, 76, 94, 0.22)",
+            }}
+          >
+            {erroTurnos}
+          </div>
+        )}
+
+        {carregandoTurnos ? (
+          <div className="flex items-center justify-center py-12">
+            <RefreshCw className="h-6 w-6 animate-spin" style={{ color: "var(--accent-primary)" }} />
+          </div>
+        ) : (
+          <div className="glass-card divide-y" style={{ borderColor: "var(--line)" }}>
+            {DIAS_SEMANA.map((nomeDia, diaSemana) => (
+              <div key={diaSemana} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <CalendarClock className="h-4 w-4" style={{ color: "var(--accent-primary)" }} />
+                  <span className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>
+                    {nomeDia}
+                  </span>
+                </div>
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                  {(turnosPorDia[diaSemana] || []).length === 0 ? (
+                    <span className="text-xs italic" style={{ color: "var(--text-muted)" }}>
+                      Fechado
+                    </span>
+                  ) : (
+                    turnosPorDia[diaSemana].map((t) => (
+                      <span
+                        key={t.id}
+                        className="inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-xs font-medium"
+                        style={{ background: "var(--c2)", color: "var(--text-secondary)" }}
+                      >
+                        {hhmm(t.hora_abertura)}–{hhmm(t.hora_fechamento)}
+                        <button
+                          onClick={() => abrirModalEditarTurno(t)}
+                          title="Editar turno"
+                          style={{ color: "var(--accent-primary)" }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => setTurnoExcluindo(t)}
+                          title="Excluir turno"
+                          style={{ color: "var(--accent-coral)" }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal Criar/Editar Turno */}
+      {modalTurnoAberto && (
+        <div className="modal-overlay">
+          <form onSubmit={handleSubmitTurno} className="modal-content w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <CalendarClock className="h-5 w-5 shrink-0" style={{ color: "var(--accent-primary)" }} />
+              <h3 className="font-display text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+                {turnoEditando ? "Editar Turno" : "Novo Turno"}
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                Dia da semana
+                <select
+                  name="dia_semana"
+                  defaultValue={turnoEditando?.dia_semana ?? 1}
+                  className="glass-select mt-1.5"
+                  required
+                >
+                  {DIAS_SEMANA.map((nome, idx) => (
+                    <option key={idx} value={idx}>
+                      {nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                  Abertura
+                  <input
+                    type="time"
+                    name="hora_abertura"
+                    defaultValue={turnoEditando ? hhmm(turnoEditando.hora_abertura) : ""}
+                    required
+                    className="glass-input mt-1.5"
+                  />
+                </label>
+                <label className="block text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                  Fechamento
+                  <input
+                    type="time"
+                    name="hora_fechamento"
+                    defaultValue={turnoEditando ? hhmm(turnoEditando.hora_fechamento) : ""}
+                    required
+                    className="glass-input mt-1.5"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {erroFormTurno && (
+              <div
+                className="rounded-lg px-3 py-2 text-xs"
+                style={{ background: "var(--accent-coral-muted)", color: "var(--accent-coral)" }}
+              >
+                {erroFormTurno}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2" style={{ borderTop: "1px solid var(--line)" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalTurnoAberto(false);
+                  setTurnoEditando(null);
+                }}
+                className="glass-btn glass-btn-ghost text-xs"
+              >
+                Cancelar
+              </button>
+              <button type="submit" disabled={salvandoTurno} className="glass-btn glass-btn-primary text-xs">
+                {salvandoTurno ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Aviso de sobreposição de turnos (AC 6) */}
+      {avisoSobreposicao && (
+        <div className="modal-overlay">
+          <div className="modal-content w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-6 w-6 shrink-0" style={{ color: "var(--accent-amber)" }} />
+              <h3 className="font-display text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+                Turnos se sobrepõem
+              </h3>
+            </div>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              O turno {hhmm(avisoSobreposicao.hora_abertura)}–{hhmm(avisoSobreposicao.hora_fechamento)} em{" "}
+              <strong>{DIAS_SEMANA[avisoSobreposicao.dia_semana]}</strong> se sobrepõe a outro turno já cadastrado
+              nesse dia. Isso não é bloqueado pelo sistema, mas normalmente é engano no cadastro. Deseja salvar
+              mesmo assim?
+            </p>
+            <div className="flex justify-end gap-3 pt-2" style={{ borderTop: "1px solid var(--line)" }}>
+              <button onClick={() => setAvisoSobreposicao(null)} className="glass-btn glass-btn-ghost text-xs">
+                Cancelar
+              </button>
+              <button
+                onClick={() => void salvarTurno(avisoSobreposicao)}
+                disabled={salvandoTurno}
+                className="glass-btn glass-btn-primary text-xs"
+              >
+                {salvandoTurno ? "Salvando..." : "Salvar mesmo assim"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excluir Turno */}
+      {turnoExcluindo && (
+        <div className="modal-overlay">
+          <div className="modal-content w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <Trash2 className="h-5 w-5 shrink-0" style={{ color: "var(--accent-coral)" }} />
+              <h3 className="font-display text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+                Excluir Turno
+              </h3>
+            </div>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              Remover o turno {hhmm(turnoExcluindo.hora_abertura)}–{hhmm(turnoExcluindo.hora_fechamento)} de{" "}
+              <strong>{DIAS_SEMANA[turnoExcluindo.dia_semana]}</strong>? A IA deixará de oferecer esse intervalo em
+              agendamentos imediatamente.
+            </p>
+            <div className="flex justify-end gap-3 pt-2" style={{ borderTop: "1px solid var(--line)" }}>
+              <button onClick={() => setTurnoExcluindo(null)} className="glass-btn glass-btn-ghost text-xs">
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarExcluirTurno}
+                disabled={salvandoTurno}
+                className="glass-btn glass-btn-primary text-xs"
+                style={{ background: "var(--accent-coral)" }}
+              >
+                {salvandoTurno ? "Excluindo..." : "Excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       {confirmingChannel && (
